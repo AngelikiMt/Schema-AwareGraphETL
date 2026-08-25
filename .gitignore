@@ -1,0 +1,44 @@
+# Python Environment & Dependencies
+venv/
+.venv/
+env/
+ENV/
+
+# Secrets
+.env/
+
+# Python bytecode
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Distribution / packaging
+bin/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Streamlit & UI Temporary Files
+temp_graph.html
+temp_report.html
+.streamlit/config.toml
+
+# Project Configurations & Generated Outputs
+mapping_config.json
+
+# logs
+.logs
