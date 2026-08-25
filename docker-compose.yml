@@ -1,0 +1,29 @@
+services:
+  mysql-db:
+    image: mysql:latest
+    container_name: mysql-dissertation
+    environment:
+      MYSQL_ROOT_PASSWORD: "1234"
+      MYSQL_DATABASE: "cdbase"
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: always
+
+  streamlit-app:
+    build: .
+    container_name: streamlit-etl-app
+    ports:
+      - "8501:8501"
+    depends_on:
+      - mysql-db
+    
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/app
+    restart: always
+
+volumes:
+  mysql_data:
