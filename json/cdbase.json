@@ -1,0 +1,118 @@
+{
+    "nodes": [
+        {
+            "table_name": "cd",
+            "target_label": "cd",
+            "primary_keys": [
+                "cid"
+            ],
+            "properties": [
+                "cid",
+                "ctitle",
+                "year",
+                "comid"
+            ]
+        },
+        {
+            "table_name": "company",
+            "target_label": "company",
+            "primary_keys": [
+                "comid"
+            ],
+            "properties": [
+                "comid",
+                "name"
+            ]
+        },
+        {
+            "table_name": "performer",
+            "target_label": "performer",
+            "primary_keys": [
+                "pid"
+            ],
+            "properties": [
+                "pid",
+                "name"
+            ]
+        },
+        {
+            "table_name": "song",
+            "target_label": "song",
+            "primary_keys": [
+                "sid"
+            ],
+            "properties": [
+                "sid",
+                "stitle"
+            ]
+        },
+        {
+            "table_name": "track",
+            "target_label": "track",
+            "primary_keys": [
+                "cid",
+                "pos"
+            ],
+            "properties": [
+                "pid",
+                "cid",
+                "sid",
+                "pos"
+            ]
+        }
+    ],
+    "relationships": [
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "cd",
+            "pk_table": "company",
+            "fk_columns": [
+                "comid"
+            ],
+            "pk_columns": [
+                "comid"
+            ],
+            "relationship_type": "CD_TO_COMPANY",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "track",
+            "pk_table": "cd",
+            "fk_columns": [
+                "cid"
+            ],
+            "pk_columns": [
+                "cid"
+            ],
+            "relationship_type": "TRACK_TO_CD",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "track",
+            "pk_table": "song",
+            "fk_columns": [
+                "sid"
+            ],
+            "pk_columns": [
+                "sid"
+            ],
+            "relationship_type": "TRACK_TO_SONG",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "track",
+            "pk_table": "performer",
+            "fk_columns": [
+                "pid"
+            ],
+            "pk_columns": [
+                "pid"
+            ],
+            "relationship_type": "TRACK_TO_PERFORMER",
+            "direction": "FORWARD"
+        }
+    ]
+}

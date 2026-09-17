@@ -1,0 +1,128 @@
+{
+    "nodes": [
+        {
+            "table_name": "activity",
+            "target_label": "activity",
+            "primary_keys": [
+                "acode"
+            ],
+            "properties": [
+                "acode",
+                "aname",
+                "duration_in_minutes"
+            ]
+        },
+        {
+            "table_name": "hotel",
+            "target_label": "hotel",
+            "primary_keys": [
+                "hcode"
+            ],
+            "properties": [
+                "hcode",
+                "name",
+                "city",
+                "country"
+            ]
+        },
+        {
+            "table_name": "participate",
+            "target_label": "participate",
+            "primary_keys": [
+                "tcode",
+                "acode",
+                "year"
+            ],
+            "properties": [
+                "tcode",
+                "acode",
+                "year",
+                "cost"
+            ]
+        },
+        {
+            "table_name": "stay",
+            "target_label": "stay",
+            "primary_keys": [
+                "hcode",
+                "tcode",
+                "year"
+            ],
+            "properties": [
+                "hcode",
+                "tcode",
+                "year",
+                "days",
+                "cost"
+            ]
+        },
+        {
+            "table_name": "tourist",
+            "target_label": "tourist",
+            "primary_keys": [
+                "tcode"
+            ],
+            "properties": [
+                "tcode",
+                "name",
+                "country",
+                "age",
+                "gender"
+            ]
+        }
+    ],
+    "relationships": [
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "participate",
+            "pk_table": "activity",
+            "fk_columns": [
+                "acode"
+            ],
+            "pk_columns": [
+                "acode"
+            ],
+            "relationship_type": "PARTICIPATE_TO_ACTIVITY",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "participate",
+            "pk_table": "tourist",
+            "fk_columns": [
+                "tcode"
+            ],
+            "pk_columns": [
+                "tcode"
+            ],
+            "relationship_type": "PARTICIPATE_TO_TOURIST",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "stay",
+            "pk_table": "hotel",
+            "fk_columns": [
+                "hcode"
+            ],
+            "pk_columns": [
+                "hcode"
+            ],
+            "relationship_type": "STAY_TO_HOTEL",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "stay",
+            "pk_table": "tourist",
+            "fk_columns": [
+                "tcode"
+            ],
+            "pk_columns": [
+                "tcode"
+            ],
+            "relationship_type": "STAY_TO_TOURIST",
+            "direction": "FORWARD"
+        }
+    ]
+}

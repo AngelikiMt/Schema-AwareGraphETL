@@ -1,0 +1,156 @@
+{
+    "nodes": [
+        {
+            "table_name": "categories",
+            "target_label": "categories",
+            "primary_keys": [
+                "CategoryID"
+            ],
+            "properties": [
+                "CategoryID",
+                "CategoryName",
+                "Description",
+                "Picture"
+            ]
+        },
+        {
+            "table_name": "customers",
+            "target_label": "customers",
+            "primary_keys": [
+                "CustomerID"
+            ],
+            "properties": [
+                "CustomerID",
+                "CompanyName",
+                "ContactName",
+                "ContactTitle",
+                "Address",
+                "City",
+                "Region",
+                "PostalCode",
+                "Country",
+                "Phone",
+                "Fax",
+                "Image",
+                "ImageThumbnail"
+            ]
+        },
+        {
+            "table_name": "employees",
+            "target_label": "employees",
+            "primary_keys": [
+                "EmployeeID"
+            ],
+            "properties": [
+                "EmployeeID",
+                "LastName",
+                "FirstName",
+                "Title",
+                "TitleOfCourtesy",
+                "BirthDate",
+                "HireDate",
+                "Address",
+                "City",
+                "Region",
+                "PostalCode",
+                "Country",
+                "HomePhone",
+                "Extension",
+                "Photo",
+                "Notes",
+                "ReportsTo"
+            ]
+        },
+        {
+            "table_name": "order details",
+            "target_label": "order details",
+            "primary_keys": [
+                "OrderID",
+                "ProductID"
+            ],
+            "properties": [
+                "OrderID",
+                "ProductID",
+                "UnitPrice",
+                "Quantity",
+                "Discount"
+            ]
+        },
+        {
+            "table_name": "orders",
+            "target_label": "orders",
+            "primary_keys": [
+                "OrderID"
+            ],
+            "properties": [
+                "OrderID",
+                "CustomerID",
+                "EmployeeID",
+                "OrderDate",
+                "RequiredDate",
+                "ShippedDate",
+                "ShipVia",
+                "Freight",
+                "ShipName",
+                "ShipAddress",
+                "ShipCity",
+                "ShipRegion",
+                "ShipPostalCode",
+                "ShipCountry"
+            ]
+        },
+        {
+            "table_name": "products",
+            "target_label": "products",
+            "primary_keys": [
+                "ProductID"
+            ],
+            "properties": [
+                "ProductID",
+                "ProductName",
+                "SupplierID",
+                "CategoryID",
+                "QuantityPerUnit",
+                "UnitPrice",
+                "UnitsInStock",
+                "UnitsOnOrder",
+                "ReorderLevel",
+                "Discontinued"
+            ]
+        },
+        {
+            "table_name": "shippers",
+            "target_label": "shippers",
+            "primary_keys": [
+                "ShipperID"
+            ],
+            "properties": [
+                "ShipperID",
+                "CompanyName",
+                "Phone"
+            ]
+        },
+        {
+            "table_name": "suppliers",
+            "target_label": "suppliers",
+            "primary_keys": [
+                "SupplierID"
+            ],
+            "properties": [
+                "SupplierID",
+                "CompanyName",
+                "ContactName",
+                "ContactTitle",
+                "Address",
+                "City",
+                "Region",
+                "PostalCode",
+                "Country",
+                "Phone",
+                "Fax",
+                "HomePage"
+            ]
+        }
+    ],
+    "relationships": []
+}

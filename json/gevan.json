@@ -1,0 +1,189 @@
+{
+    "nodes": [
+        {
+            "table_name": "ΑΜΦΙΘΕΑΤΡΟ",
+            "target_label": "ΑΜΦΙΘΕΑΤΡΟ",
+            "primary_keys": [
+                "κωδ"
+            ],
+            "properties": [
+                "κωδ",
+                "θέσεις"
+            ]
+        },
+        {
+            "table_name": "ΔΙΔΑΣΚΩΝ",
+            "target_label": "ΔΙΔΑΣΚΩΝ",
+            "primary_keys": [
+                "κωδ"
+            ],
+            "properties": [
+                "κωδ",
+                "όνομα"
+            ]
+        },
+        {
+            "table_name": "ΕΞΕΤΑΣΗ",
+            "target_label": "ΕΞΕΤΑΣΗ",
+            "primary_keys": [
+                "κωδ_μαθ",
+                "εξεταστική"
+            ],
+            "properties": [
+                "κωδ_μαθ",
+                "εξεταστική"
+            ]
+        },
+        {
+            "table_name": "ΕΠΙΤΗΡΗΤΗΣ",
+            "target_label": "ΕΠΙΤΗΡΗΤΗΣ",
+            "primary_keys": [
+                "κωδ"
+            ],
+            "properties": [
+                "κωδ",
+                "όνομα"
+            ]
+        },
+        {
+            "table_name": "ΜΑΘΗΜΑ",
+            "target_label": "ΜΑΘΗΜΑ",
+            "primary_keys": [
+                "κωδ"
+            ],
+            "properties": [
+                "κωδ",
+                "τίτλος"
+            ]
+        },
+        {
+            "table_name": "ΤΜΗΜΑ",
+            "target_label": "ΤΜΗΜΑ",
+            "primary_keys": [
+                "κωδ_μαθ",
+                "α_α"
+            ],
+            "properties": [
+                "κωδ_μαθ",
+                "α_α",
+                "κωδ_διδάσκοντος",
+                "κωδ_αμφιθεάτρου",
+                "ημέρα",
+                "ώρα"
+            ]
+        },
+        {
+            "table_name": "ΦΟΙΤΗΤΗΣ",
+            "target_label": "ΦΟΙΤΗΤΗΣ",
+            "primary_keys": [
+                "ΑΕΜ"
+            ],
+            "properties": [
+                "ΑΕΜ",
+                "όνομα"
+            ]
+        }
+    ],
+    "relationships": [
+        {
+            "type": "MANY_TO_MANY",
+            "junction_table": "ΑΝΗΚΕΙ",
+            "source_table": "ΦΟΙΤΗΤΗΣ",
+            "source_pk": [
+                "ΑΕΜ"
+            ],
+            "source_fk": [
+                "ΑΕΜ"
+            ],
+            "target_table": "ΤΜΗΜΑ",
+            "target_pk": [
+                "κωδ_μαθ",
+                "α_α"
+            ],
+            "target_fk": [
+                "κωδ_μαθ",
+                "α_α_τμήματος"
+            ],
+            "relationship_type": "ΑΝΗΚΕΙ",
+            "direction": "FORWARD",
+            "properties": []
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "ΕΞΕΤΑΣΗ",
+            "pk_table": "ΜΑΘΗΜΑ",
+            "fk_columns": [
+                "κωδ_μαθ"
+            ],
+            "pk_columns": [
+                "κωδ"
+            ],
+            "relationship_type": "ΕΞΕΤΑΣΗ_TO_ΜΑΘΗΜΑ",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "ΤΜΗΜΑ",
+            "pk_table": "ΜΑΘΗΜΑ",
+            "fk_columns": [
+                "κωδ_μαθ"
+            ],
+            "pk_columns": [
+                "κωδ"
+            ],
+            "relationship_type": "ΤΜΗΜΑ_TO_ΜΑΘΗΜΑ",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "ΤΜΗΜΑ",
+            "pk_table": "ΔΙΔΑΣΚΩΝ",
+            "fk_columns": [
+                "κωδ_διδάσκοντος"
+            ],
+            "pk_columns": [
+                "κωδ"
+            ],
+            "relationship_type": "ΤΜΗΜΑ_TO_ΔΙΔΑΣΚΩΝ",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "ΤΜΗΜΑ",
+            "pk_table": "ΑΜΦΙΘΕΑΤΡΟ",
+            "fk_columns": [
+                "κωδ_αμφιθεάτρου"
+            ],
+            "pk_columns": [
+                "κωδ"
+            ],
+            "relationship_type": "ΤΜΗΜΑ_TO_ΑΜΦΙΘΕΑΤΡΟ",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "MANY_TO_MANY",
+            "junction_table": "ΦΙΛΟΞΕΝΕΙΤΑΙ",
+            "source_table": "ΕΠΙΤΗΡΗΤΗΣ",
+            "source_pk": [
+                "κωδ"
+            ],
+            "source_fk": [
+                "κωδ_επιτηρητή"
+            ],
+            "target_table": "ΕΞΕΤΑΣΗ",
+            "target_pk": [
+                "κωδ_μαθ",
+                "εξεταστική"
+            ],
+            "target_fk": [
+                "κωδ_μαθ",
+                "εξεταστική"
+            ],
+            "relationship_type": "ΦΙΛΟΞΕΝΕΙΤΑΙ",
+            "direction": "FORWARD",
+            "properties": [
+                "κωδ_επιτηρητή"
+            ]
+        }
+    ]
+}
