@@ -1,0 +1,495 @@
+{
+    "nodes": [
+        {
+            "table_name": "actor",
+            "target_label": "actor",
+            "primary_keys": [
+                "actor_id"
+            ],
+            "properties": [
+                "actor_id",
+                "first_name",
+                "last_name",
+                "last_update"
+            ]
+        },
+        {
+            "table_name": "address",
+            "target_label": "address",
+            "primary_keys": [
+                "address_id"
+            ],
+            "properties": [
+                "address_id",
+                "address",
+                "address2",
+                "district",
+                "city_id",
+                "postal_code",
+                "phone",
+                "last_update"
+            ]
+        },
+        {
+            "table_name": "category",
+            "target_label": "category",
+            "primary_keys": [
+                "category_id"
+            ],
+            "properties": [
+                "category_id",
+                "name",
+                "last_update"
+            ]
+        },
+        {
+            "table_name": "city",
+            "target_label": "city",
+            "primary_keys": [
+                "city_id"
+            ],
+            "properties": [
+                "city_id",
+                "city",
+                "country_id",
+                "last_update"
+            ]
+        },
+        {
+            "table_name": "country",
+            "target_label": "country",
+            "primary_keys": [
+                "country_id"
+            ],
+            "properties": [
+                "country_id",
+                "country",
+                "last_update"
+            ]
+        },
+        {
+            "table_name": "customer",
+            "target_label": "customer",
+            "primary_keys": [
+                "customer_id"
+            ],
+            "properties": [
+                "customer_id",
+                "store_id",
+                "first_name",
+                "last_name",
+                "email",
+                "address_id",
+                "active",
+                "create_date",
+                "last_update"
+            ]
+        },
+        {
+            "table_name": "film",
+            "target_label": "film",
+            "primary_keys": [
+                "film_id"
+            ],
+            "properties": [
+                "film_id",
+                "title",
+                "description",
+                "release_year",
+                "language_id",
+                "original_language_id",
+                "rental_duration",
+                "rental_rate",
+                "length",
+                "replacement_cost",
+                "rating",
+                "special_features",
+                "last_update"
+            ]
+        },
+        {
+            "table_name": "film_text",
+            "target_label": "film_text",
+            "primary_keys": [
+                "film_id"
+            ],
+            "properties": [
+                "film_id",
+                "title",
+                "description"
+            ]
+        },
+        {
+            "table_name": "inventory",
+            "target_label": "inventory",
+            "primary_keys": [
+                "inventory_id"
+            ],
+            "properties": [
+                "inventory_id",
+                "film_id",
+                "store_id",
+                "last_update"
+            ]
+        },
+        {
+            "table_name": "language",
+            "target_label": "language",
+            "primary_keys": [
+                "language_id"
+            ],
+            "properties": [
+                "language_id",
+                "name",
+                "last_update"
+            ]
+        },
+        {
+            "table_name": "payment",
+            "target_label": "payment",
+            "primary_keys": [
+                "payment_id"
+            ],
+            "properties": [
+                "payment_id",
+                "customer_id",
+                "staff_id",
+                "rental_id",
+                "amount",
+                "payment_date",
+                "last_update"
+            ]
+        },
+        {
+            "table_name": "rental",
+            "target_label": "rental",
+            "primary_keys": [
+                "rental_id"
+            ],
+            "properties": [
+                "rental_id",
+                "rental_date",
+                "inventory_id",
+                "customer_id",
+                "return_date",
+                "staff_id",
+                "last_update"
+            ]
+        },
+        {
+            "table_name": "staff",
+            "target_label": "staff",
+            "primary_keys": [
+                "staff_id"
+            ],
+            "properties": [
+                "staff_id",
+                "first_name",
+                "last_name",
+                "address_id",
+                "picture",
+                "email",
+                "store_id",
+                "active",
+                "username",
+                "password",
+                "last_update"
+            ]
+        },
+        {
+            "table_name": "store",
+            "target_label": "store",
+            "primary_keys": [
+                "store_id"
+            ],
+            "properties": [
+                "store_id",
+                "manager_staff_id",
+                "address_id",
+                "last_update"
+            ]
+        }
+    ],
+    "relationships": [
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "address",
+            "pk_table": "city",
+            "fk_columns": [
+                "city_id"
+            ],
+            "pk_columns": [
+                "city_id"
+            ],
+            "relationship_type": "ADDRESS_TO_CITY",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "city",
+            "pk_table": "country",
+            "fk_columns": [
+                "country_id"
+            ],
+            "pk_columns": [
+                "country_id"
+            ],
+            "relationship_type": "CITY_TO_COUNTRY",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "customer",
+            "pk_table": "address",
+            "fk_columns": [
+                "address_id"
+            ],
+            "pk_columns": [
+                "address_id"
+            ],
+            "relationship_type": "CUSTOMER_TO_ADDRESS",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "customer",
+            "pk_table": "store",
+            "fk_columns": [
+                "store_id"
+            ],
+            "pk_columns": [
+                "store_id"
+            ],
+            "relationship_type": "CUSTOMER_TO_STORE",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "film",
+            "pk_table": "language",
+            "fk_columns": [
+                "language_id"
+            ],
+            "pk_columns": [
+                "language_id"
+            ],
+            "relationship_type": "FILM_TO_LANGUAGE",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "film",
+            "pk_table": "language",
+            "fk_columns": [
+                "original_language_id"
+            ],
+            "pk_columns": [
+                "language_id"
+            ],
+            "relationship_type": "FILM_TO_LANGUAGE",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "MANY_TO_MANY",
+            "junction_table": "film_actor",
+            "source_table": "actor",
+            "source_pk": [
+                "actor_id"
+            ],
+            "source_fk": [
+                "actor_id"
+            ],
+            "target_table": "film",
+            "target_pk": [
+                "film_id"
+            ],
+            "target_fk": [
+                "film_id"
+            ],
+            "relationship_type": "FILM_ACTOR",
+            "direction": "FORWARD",
+            "properties": [
+                "last_update"
+            ]
+        },
+        {
+            "type": "MANY_TO_MANY",
+            "junction_table": "film_category",
+            "source_table": "category",
+            "source_pk": [
+                "category_id"
+            ],
+            "source_fk": [
+                "category_id"
+            ],
+            "target_table": "film",
+            "target_pk": [
+                "film_id"
+            ],
+            "target_fk": [
+                "film_id"
+            ],
+            "relationship_type": "FILM_CATEGORY",
+            "direction": "FORWARD",
+            "properties": [
+                "last_update"
+            ]
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "inventory",
+            "pk_table": "film",
+            "fk_columns": [
+                "film_id"
+            ],
+            "pk_columns": [
+                "film_id"
+            ],
+            "relationship_type": "INVENTORY_TO_FILM",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "inventory",
+            "pk_table": "store",
+            "fk_columns": [
+                "store_id"
+            ],
+            "pk_columns": [
+                "store_id"
+            ],
+            "relationship_type": "INVENTORY_TO_STORE",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "payment",
+            "pk_table": "customer",
+            "fk_columns": [
+                "customer_id"
+            ],
+            "pk_columns": [
+                "customer_id"
+            ],
+            "relationship_type": "PAYMENT_TO_CUSTOMER",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "payment",
+            "pk_table": "rental",
+            "fk_columns": [
+                "rental_id"
+            ],
+            "pk_columns": [
+                "rental_id"
+            ],
+            "relationship_type": "PAYMENT_TO_RENTAL",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "payment",
+            "pk_table": "staff",
+            "fk_columns": [
+                "staff_id"
+            ],
+            "pk_columns": [
+                "staff_id"
+            ],
+            "relationship_type": "PAYMENT_TO_STAFF",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "rental",
+            "pk_table": "customer",
+            "fk_columns": [
+                "customer_id"
+            ],
+            "pk_columns": [
+                "customer_id"
+            ],
+            "relationship_type": "RENTAL_TO_CUSTOMER",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "rental",
+            "pk_table": "inventory",
+            "fk_columns": [
+                "inventory_id"
+            ],
+            "pk_columns": [
+                "inventory_id"
+            ],
+            "relationship_type": "RENTAL_TO_INVENTORY",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "rental",
+            "pk_table": "staff",
+            "fk_columns": [
+                "staff_id"
+            ],
+            "pk_columns": [
+                "staff_id"
+            ],
+            "relationship_type": "RENTAL_TO_STAFF",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "staff",
+            "pk_table": "address",
+            "fk_columns": [
+                "address_id"
+            ],
+            "pk_columns": [
+                "address_id"
+            ],
+            "relationship_type": "STAFF_TO_ADDRESS",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "staff",
+            "pk_table": "store",
+            "fk_columns": [
+                "store_id"
+            ],
+            "pk_columns": [
+                "store_id"
+            ],
+            "relationship_type": "STAFF_TO_STORE",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "store",
+            "pk_table": "address",
+            "fk_columns": [
+                "address_id"
+            ],
+            "pk_columns": [
+                "address_id"
+            ],
+            "relationship_type": "STORE_TO_ADDRESS",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "store",
+            "pk_table": "staff",
+            "fk_columns": [
+                "manager_staff_id"
+            ],
+            "pk_columns": [
+                "staff_id"
+            ],
+            "relationship_type": "STORE_TO_STAFF",
+            "direction": "FORWARD"
+        }
+    ]
+}

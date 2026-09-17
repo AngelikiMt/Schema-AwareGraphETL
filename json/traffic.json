@@ -1,0 +1,118 @@
+{
+    "nodes": [
+        {
+            "table_name": "camera",
+            "target_label": "camera",
+            "primary_keys": [
+                "id"
+            ],
+            "properties": [
+                "id",
+                "perim"
+            ]
+        },
+        {
+            "table_name": "image",
+            "target_label": "image",
+            "primary_keys": [
+                "camera",
+                "whn"
+            ],
+            "properties": [
+                "camera",
+                "whn",
+                "reg"
+            ]
+        },
+        {
+            "table_name": "owner",
+            "target_label": "owner",
+            "primary_keys": [
+                "id"
+            ],
+            "properties": [
+                "id",
+                "name",
+                "address"
+            ]
+        },
+        {
+            "table_name": "permit",
+            "target_label": "permit",
+            "primary_keys": [
+                "reg",
+                "sDate"
+            ],
+            "properties": [
+                "reg",
+                "sDate",
+                "chargeType"
+            ]
+        },
+        {
+            "table_name": "vehicle",
+            "target_label": "vehicle",
+            "primary_keys": [
+                "id"
+            ],
+            "properties": [
+                "id",
+                "owner"
+            ]
+        }
+    ],
+    "relationships": [
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "image",
+            "pk_table": "camera",
+            "fk_columns": [
+                "camera"
+            ],
+            "pk_columns": [
+                "id"
+            ],
+            "relationship_type": "IMAGE_TO_CAMERA",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "image",
+            "pk_table": "vehicle",
+            "fk_columns": [
+                "reg"
+            ],
+            "pk_columns": [
+                "id"
+            ],
+            "relationship_type": "IMAGE_TO_VEHICLE",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "permit",
+            "pk_table": "vehicle",
+            "fk_columns": [
+                "reg"
+            ],
+            "pk_columns": [
+                "id"
+            ],
+            "relationship_type": "PERMIT_TO_VEHICLE",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "vehicle",
+            "pk_table": "owner",
+            "fk_columns": [
+                "owner"
+            ],
+            "pk_columns": [
+                "id"
+            ],
+            "relationship_type": "VEHICLE_TO_OWNER",
+            "direction": "FORWARD"
+        }
+    ]
+}

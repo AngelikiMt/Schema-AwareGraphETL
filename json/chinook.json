@@ -1,0 +1,296 @@
+{
+    "nodes": [
+        {
+            "table_name": "Album",
+            "target_label": "Album",
+            "primary_keys": [
+                "AlbumId"
+            ],
+            "properties": [
+                "AlbumId",
+                "Title",
+                "ArtistId"
+            ]
+        },
+        {
+            "table_name": "Artist",
+            "target_label": "Artist",
+            "primary_keys": [
+                "ArtistId"
+            ],
+            "properties": [
+                "ArtistId",
+                "Name"
+            ]
+        },
+        {
+            "table_name": "Customer",
+            "target_label": "Customer",
+            "primary_keys": [
+                "CustomerId"
+            ],
+            "properties": [
+                "CustomerId",
+                "FirstName",
+                "LastName",
+                "Company",
+                "Address",
+                "City",
+                "State",
+                "Country",
+                "PostalCode",
+                "Phone",
+                "Fax",
+                "Email",
+                "SupportRepId"
+            ]
+        },
+        {
+            "table_name": "Employee",
+            "target_label": "Employee",
+            "primary_keys": [
+                "EmployeeId"
+            ],
+            "properties": [
+                "EmployeeId",
+                "LastName",
+                "FirstName",
+                "Title",
+                "ReportsTo",
+                "BirthDate",
+                "HireDate",
+                "Address",
+                "City",
+                "State",
+                "Country",
+                "PostalCode",
+                "Phone",
+                "Fax",
+                "Email"
+            ]
+        },
+        {
+            "table_name": "Genre",
+            "target_label": "Genre",
+            "primary_keys": [
+                "GenreId"
+            ],
+            "properties": [
+                "GenreId",
+                "Name"
+            ]
+        },
+        {
+            "table_name": "Invoice",
+            "target_label": "Invoice",
+            "primary_keys": [
+                "InvoiceId"
+            ],
+            "properties": [
+                "InvoiceId",
+                "CustomerId",
+                "InvoiceDate",
+                "BillingAddress",
+                "BillingCity",
+                "BillingState",
+                "BillingCountry",
+                "BillingPostalCode",
+                "Total"
+            ]
+        },
+        {
+            "table_name": "InvoiceLine",
+            "target_label": "InvoiceLine",
+            "primary_keys": [
+                "InvoiceLineId"
+            ],
+            "properties": [
+                "InvoiceLineId",
+                "InvoiceId",
+                "TrackId",
+                "UnitPrice",
+                "Quantity"
+            ]
+        },
+        {
+            "table_name": "MediaType",
+            "target_label": "MediaType",
+            "primary_keys": [
+                "MediaTypeId"
+            ],
+            "properties": [
+                "MediaTypeId",
+                "Name"
+            ]
+        },
+        {
+            "table_name": "Playlist",
+            "target_label": "Playlist",
+            "primary_keys": [
+                "PlaylistId"
+            ],
+            "properties": [
+                "PlaylistId",
+                "Name"
+            ]
+        },
+        {
+            "table_name": "Track",
+            "target_label": "Track",
+            "primary_keys": [
+                "TrackId"
+            ],
+            "properties": [
+                "TrackId",
+                "Name",
+                "AlbumId",
+                "MediaTypeId",
+                "GenreId",
+                "Composer",
+                "Milliseconds",
+                "Bytes",
+                "UnitPrice"
+            ]
+        }
+    ],
+    "relationships": [
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "Album",
+            "pk_table": "Artist",
+            "fk_columns": [
+                "ArtistId"
+            ],
+            "pk_columns": [
+                "ArtistId"
+            ],
+            "relationship_type": "ALBUM_TO_ARTIST",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "Customer",
+            "pk_table": "Employee",
+            "fk_columns": [
+                "SupportRepId"
+            ],
+            "pk_columns": [
+                "EmployeeId"
+            ],
+            "relationship_type": "CUSTOMER_TO_EMPLOYEE",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "Employee",
+            "pk_table": "Employee",
+            "fk_columns": [
+                "ReportsTo"
+            ],
+            "pk_columns": [
+                "EmployeeId"
+            ],
+            "relationship_type": "EMPLOYEE_TO_EMPLOYEE",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "Invoice",
+            "pk_table": "Customer",
+            "fk_columns": [
+                "CustomerId"
+            ],
+            "pk_columns": [
+                "CustomerId"
+            ],
+            "relationship_type": "INVOICE_TO_CUSTOMER",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "InvoiceLine",
+            "pk_table": "Invoice",
+            "fk_columns": [
+                "InvoiceId"
+            ],
+            "pk_columns": [
+                "InvoiceId"
+            ],
+            "relationship_type": "INVOICELINE_TO_INVOICE",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "InvoiceLine",
+            "pk_table": "Track",
+            "fk_columns": [
+                "TrackId"
+            ],
+            "pk_columns": [
+                "TrackId"
+            ],
+            "relationship_type": "INVOICELINE_TO_TRACK",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "MANY_TO_MANY",
+            "junction_table": "PlaylistTrack",
+            "source_table": "Playlist",
+            "source_pk": [
+                "PlaylistId"
+            ],
+            "source_fk": [
+                "PlaylistId"
+            ],
+            "target_table": "Track",
+            "target_pk": [
+                "TrackId"
+            ],
+            "target_fk": [
+                "TrackId"
+            ],
+            "relationship_type": "PLAYLISTTRACK",
+            "direction": "FORWARD",
+            "properties": []
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "Track",
+            "pk_table": "Album",
+            "fk_columns": [
+                "AlbumId"
+            ],
+            "pk_columns": [
+                "AlbumId"
+            ],
+            "relationship_type": "TRACK_TO_ALBUM",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "Track",
+            "pk_table": "Genre",
+            "fk_columns": [
+                "GenreId"
+            ],
+            "pk_columns": [
+                "GenreId"
+            ],
+            "relationship_type": "TRACK_TO_GENRE",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "Track",
+            "pk_table": "MediaType",
+            "fk_columns": [
+                "MediaTypeId"
+            ],
+            "pk_columns": [
+                "MediaTypeId"
+            ],
+            "relationship_type": "TRACK_TO_MEDIATYPE",
+            "direction": "FORWARD"
+        }
+    ]
+}
