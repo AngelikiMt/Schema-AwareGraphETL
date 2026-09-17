@@ -14,20 +14,20 @@ from loguru import logger
 
 import graph_ingestion
 import graph_visualizer
-import schema_extractor  # Imported directly to run natively inside Docker
+import schema_extractor
 from sqlalchemy import create_engine, inspect, text
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configure loguru to write logs once globally
-logger.remove()  # Remove default handler to avoid mixing stdout
+logger.remove()
 logger.add(lambda msg: print(msg, end=""), level="INFO")
 logger.add("app_pipeline.log", rotation="10 MB", retention="10 days", level="DEBUG")
 
-# Target credentials inside the Docker network layout
 DATABASE_DOCKER_CONNECTION = os.environ.get('DATABASE_DOCKER_CONNECTION')
 DATABASE_CONNECTION_URI = os.environ.get('DATABASE_CONNECTION_URI')
+
+st.set_page_config(layout="wide")
 
 # ----------------- Orchestrator - Automation -----------------
 if not os.path.exists("mapping_config.json"):
@@ -42,62 +42,48 @@ if not os.path.exists("mapping_config.json"):
         st.error("Critical Error: Failed to extract schema from the database.")
         st.stop()
 
-st.set_page_config(layout="wide")
-
 # ----------------- NAVIGATION STATE MANAGEMENT -----------------
 SIDEBAR_PAGES = [
     "Upload New Database",
     "Run Graph Ingestion and Visualization"
 ]
 
-# Initialize state variables
 if "page_selection" not in st.session_state:
     st.session_state["page_selection"] = "Upload New Database"
 
-# Check if a custom button click requested a page transition
-if st.session_state.get("skip_sidebar_override", False):
-    st.session_state["skip_sidebar_override"] = False
-    current_page = st.session_state["page_selection"]
+st.sidebar.title("Page Navigation")
+
+if st.session_state["page_selection"] in SIDEBAR_PAGES:
+    current_idx = SIDEBAR_PAGES.index(st.session_state["page_selection"])
+    
+    selected_stage = st.sidebar.radio(
+        "Select Operation Stage",
+        SIDEBAR_PAGES,
+        index=current_idx
+    )
+    
+    if selected_stage != st.session_state["page_selection"]:
+        st.session_state["page_selection"] = selected_stage
+        st.rerun()
+
 else:
-    current_page = st.session_state["page_selection"]
-
-st.sidebar.title("Graph ETL Platform")
-
-# Sync sidebar radio index safely
-if current_page == "Run Graph Ingestion and Visualization":
-    radio_index = 1
-else:
-    radio_index = 0
-
-# Sidebar radio selection (Customization is hidden from here)
-selected_sidebar_page = st.sidebar.radio(
-    "Select Operation Stage",
-    SIDEBAR_PAGES,
-    index=radio_index,
-    key="navigation_radio"
-)
-
-# Detect if the user explicitly clicked a sidebar tab
-if current_page in SIDEBAR_PAGES and selected_sidebar_page != current_page:
-    st.session_state["page_selection"] = selected_sidebar_page
-    current_page = selected_sidebar_page
-
-# Display a back button in sidebar ONLY when viewing the hidden Customization page
-if current_page == "Relationship Customization":
-    st.sidebar.markdown("---")
-    if st.sidebar.button("⬅ Back to Upload Database", use_container_width=True):
+    st.sidebar.info("⚙️ Currently editing: Relationship Customization")
+    if st.sidebar.button("⬅ Back to Upload Database", key="side_back_btn", use_container_width=True):
         st.session_state["page_selection"] = "Upload New Database"
-        st.session_state["skip_sidebar_override"] = True
         st.rerun()
 
 page = st.session_state["page_selection"]
 logger.info(f"Active App Page rendering: '{page}'")
 
+def navigate_to(target_page: str):
+    st.session_state["page_selection"] = target_page
+    st.rerun()
+
 # ----------------- PAGE 0: UPLOAD DATABASE -----------------
 if page == "Upload New Database":
     st.title("Upload New Dataset")
-    st.write("Supports any standard RDBMS SQL Dump (MySQL, PostgreSQL, SQLite, Oracle)")
-    uploaded_file = st.file_uploader("Choose a .sql file to populate the target Relational Database", type=["sql"])
+    st.write("Supports any standard RDBMS SQL Database (MySQL, PostgreSQL and SQLite)")
+    uploaded_file = st.file_uploader("Choose an .sql file to populate the target Relational Database", type=["sql"])
 
     if uploaded_file is not None:
         file_id = uploaded_file.name + "_" + str(uploaded_file.size)
@@ -113,7 +99,7 @@ if page == "Upload New Database":
 
                     inspector = inspect(local_engine)
                     existing_tables = inspector.get_table_names()
-                    logger.info(f"Dynamically detected existing tables for truncation: {existing_tables}")
+                    logger.info(f"Dynamically detected existing tables: {existing_tables}")
 
                     raw_queries = sqlparse.split(sql_script)
                     clean_queries = []      
@@ -128,6 +114,9 @@ if page == "Upload New Database":
                         if trimmed.startswith('/*') and trimmed.endswith('*/'):
                             continue
                         if trimmed.upper().startswith('LOCK TABLES') or trimmed.upper().startswith('UNLOCK TABLES'):
+                            continue
+                        upper_trimmed = trimmed.upper()
+                        if upper_trimmed.startswith('SET @OLD_') or '=@OLD_' in upper_trimmed.replace(" ", ""):
                             continue
                         if trimmed.strip(';') == '':
                             continue
@@ -178,18 +167,19 @@ if page == "Upload New Database":
                     logger.error(f"Failed to execute SQL script uploaded by user: {e}")
                     st.error(f"Failed to execute SQL script: {e}")
 
-        # Display successful upload state and navigation button
         if st.session_state.get("last_processed_file") == file_id:
             st.write("---")
             st.success("**Database schema extracted successfully!** Proceed to customize your graph model's relationships.")
             
-            # Transition button to Relationship Customization
-            if st.button("🚀 Proceed to Relationship Customization ➔", type="primary"):
-                st.session_state["page_selection"] = "Relationship Customization"
-                st.session_state["skip_sidebar_override"] = True
-                st.rerun()
+            col_c, col_i = st.columns(2)
+            with col_c:
+                if st.button("Relationship Customization ➔", key="goto_customization_btn", type="secondary", use_container_width=True):
+                    navigate_to("Relationship Customization")
+            with col_i:
+                if st.button("Graph Ingestion ➔", key="goto_ingestion_btn", type="primary", use_container_width=True):
+                    navigate_to("Run Graph Ingestion and Visualization")
 
-# ----------------- PAGE 1: CUSTOMIZATION (HIDDEN FROM SIDEBAR) -----------------
+# ----------------- PAGE 1: CUSTOMIZATION -----------------
 elif page == "Relationship Customization":
     st.title("Schema-Aware Graph ETL and Migration Pipeline")
     st.subheader("Relationship Directionality")
@@ -257,24 +247,18 @@ elif page == "Relationship Customization":
 
     st.write("---")
     
-    col_back, col_next = st.columns([1, 4])
+    col_back, col_next = st.columns(2)
     with col_back:
-        # Action button to navigate backward
-        if st.button("⬅ Back to Upload", type="secondary"):
-            st.session_state["page_selection"] = "Upload New Database"
-            st.session_state["skip_sidebar_override"] = True
-            st.rerun()
+        if st.button("⬅ Back to Upload", key="custom_back_btn", type="secondary", use_container_width=True):
+            navigate_to("Upload New Database")
             
     with col_next:
-        # Action button to navigate forward
-        if st.button("🚀 Proceed to Graph Ingestion ➔", type="primary"):
-            st.session_state["page_selection"] = "Run Graph Ingestion and Visualization"
-            st.session_state["skip_sidebar_override"] = True
-            st.rerun()
+        if st.button("Graph Ingestion ➔", key="custom_goto_ingestion_btn", type="primary", use_container_width=True):
+            navigate_to("Run Graph Ingestion and Visualization")
 
-# ----------------- PAGE 2: INGESTION & VISUALIZATION -----------------
+# ----------------- PAGE 2: INGESTION and VISUALIZATION -----------------
 elif page == "Run Graph Ingestion and Visualization":
-    st.title("Run Graph Ingestion Pipeline")
+    st.title("Run Graph Migration Pipeline")
     logger.info("Initiating structural graph ingestion routine via graph_ingestion module.")
 
     with st.spinner("Executing structural graph ingestion routine..."):
@@ -293,7 +277,7 @@ elif page == "Run Graph Ingestion and Visualization":
             with open("mapping_config.json", "r", encoding="utf-8") as f:
                 raw_data = f.read()
             st.download_button(
-                label="📄 Download Graph Topology Schema Report (JSON)",
+                label="Download Graph Topology Schema Report (JSON)",
                 data=raw_data,
                 file_name="graph_topology_report.json",
                 mime="application/json"
