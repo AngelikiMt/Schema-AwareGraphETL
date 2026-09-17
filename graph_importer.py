@@ -22,7 +22,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Connection Settings
 DATABASE_CONNECTION_URI = os.environ.get('DATABASE_CONNECTION_URI', "mysql+pymysql://root:1234@mysql-db:3306/cdbase")
 NEO4J_URI = os.environ.get('NEO4J_URI')
 NEO4J_USER = os.environ.get('NEO4J_USER')
@@ -50,28 +49,25 @@ def load_config():
 def create_constraints_and_nodes(config):
     """Creates schema constraints and ingests relational rows as Graph Nodes."""
     logger.info("Starting Phase 1: Schema Constraints Creation and Graph Node Ingestion.")
-    st.info("🔄 Phase 1: Creating constraints and streaming graph nodes...")
+    st.info("Phase 1: Creating constraints and streaming graph nodes...")
     total_chunks = 0
     chunk_idx = 0
     
     with neo4j_driver.session(database=DATABASE_NAME) as session:
-        # Create Uniqueness Constraints automatically based on Primary Keys
         for node in config["nodes"]:
             pks = node["primary_keys"]
             label = node["target_label"]
             
-            # If composite PK layout is detected, map uniqueness constraint at fusion ID instead
             constraint_prop = "_composite_id" if len(pks) > 1 else (pks[0] if pks else None)
             
             if constraint_prop:
-                constraint_query = f"CREATE CONSTRAINT FOR (n:`{label})` REQUIRE n.`{constraint_prop}` IS UNIQUE"
+                constraint_query = f"CREATE CONSTRAINT FOR (n:`{label}`) REQUIRE n.`{constraint_prop}` IS UNIQUE"
                 try:
                     session.run(constraint_query)
                     logger.info(f"Enforced uniqueness constraint on Node Label '{label}' for property '{constraint_prop}'.")
                 except Exception:
                     logger.debug(f"Uniqueness constraint for Label '{label}' already exists. Skipping.")
 
-        # Ingest data for each table leveraging chunksize for memory scalability
         for node in config["nodes"]:
             table = node["table_name"]
             label = node["target_label"]
@@ -80,14 +76,11 @@ def create_constraints_and_nodes(config):
             logger.info(f"Processing RDBMS Table: '{table}' ➔ Mapping to Target Graph Label: '{label}'")
             
             try:
-                # Streaming data from MySQL in Chunks (Memory-Efficient O(1) space complexity)
-                # Protected identifiers via explicit backticks wrapping
                 for chunk in pd.read_sql_query(f"SELECT * FROM `{table}`", mysql_engine, chunksize=10000):
                     chunk_idx += 1
                     total_chunks += 1
                     logger.info(f"Extracting batch chunk #{chunk_idx} from table '{table}' containing {len(chunk)} records.")
                     
-                    # --- DATA TYPE CASTING AND CLEANING ---
                     for col in chunk.columns:
                         if chunk[col].dtype == 'int64' and chunk[col].nunique() <= 2 and set(chunk[col].dropna().unique()).issubset({0, 1}):
                             chunk[col] = chunk[col].astype(bool)
@@ -116,7 +109,7 @@ def create_constraints_and_nodes(config):
                     session.run(cypher_query, batch=batch_data)
                     logger.info(f"Successfully unwound chunk #{chunk_idx} into label '{label}'.")
                     
-                st.caption(f"✅ Ingested table `{table}` as Graph Nodes `:{label}`")
+                st.caption(f"Ingested table `{table}` as Graph Nodes `:{label}`")
                 logger.success(f"Completed node ingestion mapping sequence for source table '{table}'.")
             except Exception as e:
                 logger.error(f"Error during streaming node ingestion for table '{table}': {e}")
@@ -127,85 +120,119 @@ def create_constraints_and_nodes(config):
 
 def create_relationships(config):
     """Generates graph edges matching the RDBMS foreign keys and custom configurations."""
-    logger.info("Starting Phase 2: Generating Directed Graph Edges (Relationships).")
-    st.info("🔄 Phase 2: Building directed graph relationship edges...")
+    logger.info("Starting Phase 2: Generating Directed Graph Edges.")
+    st.info("Phase 2: Building directed graph relationship edges...")
     total_chunks = 0
     chunk_idx = 0
     total_edges_created = 0
     
     with neo4j_driver.session(database=DATABASE_NAME) as session:
         for rel in config["relationships"]:
-            fk_table = rel["fk_table"]
-            pk_table = rel["pk_table"]
-            fk_cols = rel["fk_columns"]
-            pk_cols = rel["pk_columns"]
-            rel_type = rel["relationship_type"]
-            direction = rel["direction"]
+            rel_kind = rel.get("type", "ONE_TO_MANY")
+
+            if rel_kind == "MANY_TO_MANY":
+
+                j_table = rel["junction_table"]
+                src_table = rel["source_table"]
+                tgt_table = rel["target_table"]
+                src_fk = rel["source_fk"][0]
+                src_pk = rel["source_pk"][0]
+                tgt_fk = rel["target_fk"][0]
+                tgt_pk = rel["target_pk"][0]
+                rel_type = rel["relationship_type"]
+                direction = rel["direction"]
+
+                arrow = (
+                    f"-[:`{rel_type}`]->"
+                    if direction == "FORWARD"
+                    else f"<-[:`{rel_type}`]-"
+                )
+
+                query_sql = f"SELECT * FROM `{j_table}`"
+                for chunk in pd.read_sql_query(
+                    query_sql, mysql_engine, chunksize=10000
+                ):
+                    batch_data = chunk.astype(object).where(pd.notnull(chunk), None)
+                    batch_records = batch_data.to_dict(orient="records")
+
+                    cypher = f"""
+                                UNWIND $batch AS row
+                                MATCH (source:`{src_table}` {{{src_pk}: row.{src_fk}}})
+                                MATCH (target:`{tgt_table}` {{{tgt_pk}: row.{tgt_fk}}})
+                                MERGE (source){arrow}(target)
+                                """
+                    session.run(cypher, batch=batch_records)
+                    total_edges_created += len(batch_records)
+
+            else:
+                fk_table = rel["fk_table"]
+                pk_table = rel["pk_table"]
+                fk_cols = rel["fk_columns"]
+                pk_cols = rel["pk_columns"]
+                rel_type = rel["relationship_type"]
+                direction = rel["direction"]
             
-            try:
-                source_label = next(n["target_label"] for n in config["nodes"] if n["table_name"] == fk_table)
-                target_label = next(n["target_label"] for n in config["nodes"] if n["table_name"] == pk_table)
-                source_pks = next(n["primary_keys"] for n in config["nodes"] if n["table_name"] == fk_table)
-                target_pks = next(n["primary_keys"] for n in config["nodes"] if n["table_name"] == pk_table)            
-            except StopIteration:
-                logger.error(f"Mapping configuration schema mismatch for labels: {fk_table} or {pk_table}")
-                continue
+                try:
+                    source_label = next(n["target_label"] for n in config["nodes"] if n["table_name"] == fk_table)
+                    target_label = next(n["target_label"] for n in config["nodes"] if n["table_name"] == pk_table)
+                    source_pks = next(n["primary_keys"] for n in config["nodes"] if n["table_name"] == fk_table)
+                    target_pks = next(n["primary_keys"] for n in config["nodes"] if n["table_name"] == pk_table)            
+                except StopIteration:
+                    logger.error(f"Mapping configuration schema mismatch for labels: {fk_table} or {pk_table}")
+                    continue
+                    
+                logger.info(f"Mapping Relationship Edge [{rel_type}] ({direction}) between nodes '{source_label}' and '{target_label}'")
                 
-            logger.info(f"Mapping Relationship Edge [{rel_type}] ({direction}) between nodes '{source_label}' and '{target_label}'")
-            
-            # Select all primary keys and foreign keys to ensure reliable node matching
-            select_cols = list(set(fk_cols + source_pks))
-            cols_str = ", ".join([f"`{c}`" for c in select_cols])
-            query_sql = f"SELECT {cols_str} FROM `{fk_table}`"
-            
-            try:
-                for chunk in pd.read_sql_query(query_sql, mysql_engine, chunksize=10000):
-                    chunk_idx += 1
-                    total_chunks += 1
-                    
-                    # Compute Source Node Matching Logic (Dynamic Multi-Column Fusion)
-                    if len(source_pks) > 1:
-                        if chunk.empty:
-                            chunk["_source_composite_id"] = pd.Series(dtype=str)
-                        else:
-                            chunk["_source_composite_id"] = chunk[source_pks].astype(str).agg('_'.join, axis=1)
-                        source_match = "source._composite_id = row._source_composite_id"
-                    else:
-                        source_match = f"source.{source_pks[0]} = row.{source_pks[0]}" if source_pks else "false"
+                select_cols = list(set(fk_cols + source_pks))
+                cols_str = ", ".join([f"`{c}`" for c in select_cols])
+                query_sql = f"SELECT {cols_str} FROM `{fk_table}`"
+                
+                try:
+                    for chunk in pd.read_sql_query(query_sql, mysql_engine, chunksize=10000):
+                        chunk_idx += 1
+                        total_chunks += 1
                         
-                    # Compute Target Node Matching Logic (Dynamic Multi-Column Fusion)
-                    if len(target_pks) > 1:
-                        if chunk.empty:
-                            chunk["_target_composite_id"] = pd.Series(dtype=str)
+                        if len(source_pks) > 1:
+                            if chunk.empty:
+                                chunk["_source_composite_id"] = pd.Series(dtype=str)
+                            else:
+                                chunk["_source_composite_id"] = chunk[source_pks].astype(str).agg('_'.join, axis=1)
+                            source_match = "source._composite_id = row._source_composite_id"
                         else:
-                            chunk["_target_composite_id"] = chunk[fk_cols].astype(str).agg('_'.join, axis=1)
-                        target_match = "target._composite_id = row._target_composite_id"
-                    else:
-                        target_match = f"target.{pk_cols[0]} = row.{fk_cols[0]}"
-                    
-                    if direction == "FORWARD":
-                        cypher_rel = f"MERGE (source)-[:`{rel_type}`]->(target)"
-                    else:
-                        cypher_rel = f"MERGE (source)<-[:`{rel_type}`]-(target)"
-                    
-                    batch_data = chunk.to_dict(orient="records")
-                    
-                    cypher_query = f"""
-                    UNWIND $batch AS row
-                    MATCH (source:`{source_label}`) WHERE {source_match}
-                    MATCH (target:`{target_label}`) WHERE {target_match}
-                    {cypher_rel}
-                    """
-                    session.run(cypher_query, batch=batch_data)
-                    
-                    total_edges_created += len(batch_data)
-                    logger.info(f"Linked edge relation chunk #{chunk_idx}. Chunk total: {len(batch_data)}")
-                    
-                st.caption(f"✅ Mapped edge constraint candidate: `{fk_table}` ➔ `{pk_table}` [{rel_type}]")
-                logger.success(f"Successfully generated graph edges for relationship type [{rel_type}].")
-            except Exception as e:
-                logger.error(f"Edge generation failed for relationship type '{rel_type}': {e}")
-                raise e
+                            source_match = f"source.{source_pks[0]} = row.{source_pks[0]}" if source_pks else "false"
+                            
+                        if len(target_pks) > 1:
+                            if chunk.empty:
+                                chunk["_target_composite_id"] = pd.Series(dtype=str)
+                            else:
+                                chunk["_target_composite_id"] = chunk[fk_cols].astype(str).agg('_'.join, axis=1)
+                            target_match = "target._composite_id = row._target_composite_id"
+                        else:
+                            target_match = f"target.{pk_cols[0]} = row.{fk_cols[0]}"
+                        
+                        if direction == "FORWARD":
+                            cypher_rel = f"MERGE (source)-[:`{rel_type}`]->(target)"
+                        else:
+                            cypher_rel = f"MERGE (source)<-[:`{rel_type}`]-(target)"
+                        
+                        batch_data = chunk.to_dict(orient="records")
+                        
+                        cypher_query = f"""
+                        UNWIND $batch AS row
+                        MATCH (source:`{source_label}`) WHERE {source_match}
+                        MATCH (target:`{target_label}`) WHERE {target_match}
+                        {cypher_rel}
+                        """
+                        session.run(cypher_query, batch=batch_data)
+                        
+                        total_edges_created += len(batch_data)
+                        logger.info(f"Linked edge relation chunk #{chunk_idx}. Chunk total: {len(batch_data)}")
+                        
+                    st.caption(f"Mapped edge constraint candidate: `{fk_table}` ➔ `{pk_table}` [{rel_type}]")
+                    logger.success(f"Successfully generated graph edges for relationship type [{rel_type}].")
+                except Exception as e:
+                    logger.error(f"Edge generation failed for relationship type '{rel_type}': {e}")
+                    raise e
                 
     logger.info(f"Final number of total relationship chunks extracted: {total_chunks}.")
     return total_chunks, total_edges_created
@@ -213,7 +240,7 @@ def create_relationships(config):
 def validate_migration(config):
     """Performs an automated post-migration row-count data integrity audit."""
     logger.info("Starting Phase 3: Executing Cross-Database Data Integrity Verification Audit.")
-    st.info("🔄 Phase 3: Executing Cross-Database Data Integrity Verification Audit...")
+    st.info("Phase 3: Executing Cross-Database Data Integrity Verification Audit...")
     all_passed = True
     audit_results = []
     
@@ -263,7 +290,6 @@ def run_full_migration():
         logger.error(f"Database graph truncation flush statement execution crashed: {e}")
         raise e
         
-    # Execute Pipeline Operational Phases
     node_chunks = create_constraints_and_nodes(config_data)
     edge_chunks, total_edges = create_relationships(config_data)
     validation_status, audit_trail = validate_migration(config_data)
@@ -289,18 +315,17 @@ def run_full_migration():
         "audit_trail": audit_trail
     }
     
-    # Render Streamlit-specific dashboard metrics directly upon completion
-    st.success("🎉 Ingestion Pipeline and Cross-Database Verification Audit completed successfully!")
+    st.success("Ingestion Pipeline and Cross-Database Verification Audit completed successfully!")
     st.divider()
-    st.subheader("Pipeline Operational Benchmarking Matrix")
+    st.subheader("Pipeline Execution Performance Benchmarks")
     
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Execution Latency", f"{elapsed_time:.2f} sec")
-    c2.metric("Memory Allocated (Delta RAM)", f"{ram_used:.2f} MB")
-    c3.metric("Processed Batch Blocks", f"{total_chunks} chunks")
-    c4.metric("Unique Graph Edges Formed", f"{total_edges} relationships")
+    c1.metric("⏱️ Execution Time", f"{elapsed_time:.2f} sec")
+    c2.metric("💾 RAM Consumed", f"{ram_used:.2f} MB")
+    c3.metric("📦 Total Chunks", f"{total_chunks} chunks")
+    c4.metric("🖇️Total Unique Relationships", f"{total_edges} relationships")
     
-    st.write("#### Data Integrity Validation Audit Trail Summary")
+    st.write("#### Data Integrity Audit Trail")
     st.table(audit_trail)
     
     return metrics
