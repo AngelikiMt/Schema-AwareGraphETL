@@ -18,22 +18,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configure loguru to append logs into the central rolling file
 logger.add("app_pipeline.log", rotation="10 MB", retention="10 days", level="DEBUG")
 
-# Neo4j Connection Settings
 NEO4J_URI = os.environ.get('NEO4J_URI')
 NEO4J_USER = os.environ.get('NEO4J_USER')
 NEO4J_PASSWORD = os.environ.get('NEO4J_PASSWORD')
 DATABASE_NAME = os.environ.get('DATABASE_NAME')
 
-# Defined palette for consistency across graph and legend (Nodes)
 NODE_COLOR_PALETTE = [
     "#97c2fc", "#fb7e81", "#7be141", "#ffc0cb", "#e6a1f0",
     "#ffff00", "#ff9900", "#00ffff", "#9900cc", "#ccff00"
 ]
 
-# Distinct palette for relationships/edges (Multi-color configuration)
 EDGE_COLOR_PALETTE = [
     "#ff0000", "#0000ff", "#00aa00", "#ff00ff", "#7700aa",
     "#ff5500", "#00aaaa", "#555555", "#aa5500", "#0055a0"
@@ -55,7 +51,6 @@ def fetch_graph_data():
     node_labels_set = set()
     edge_types_set = set()
     
-    # Cypher query to fetch paths (nodes and relationships)
     query = "MATCH (s)-[r]->(t) RETURN s, r, t"
     logger.debug(f"Executing Cypher query topology fetch payload: {query}")
     
@@ -67,21 +62,18 @@ def fetch_graph_data():
                 rel = record["r"]
                 target = record["t"]
                 
-                # Extract Source Node Info
                 s_id = source.element_id
                 s_label = list(source.labels)[0]
                 s_name = source.get("name") or source.get("title") or (str(list(source.values())[0]) if source.values() else "Unknown")
                 nodes[s_id] = {"label": f"{s_label}: {s_name}", "group": s_label}
                 node_labels_set.add(s_label)
                 
-                # Extract Target Node Info
                 t_id = target.element_id
                 t_label = list(target.labels)[0]
                 t_name = target.get("name") or target.get("title") or (str(list(target.values())[0]) if target.values() else "Unknown")
                 nodes[t_id] = {"label": f"{t_label}: {t_name}", "group": t_label}
                 node_labels_set.add(t_label)
                 
-                # Extract Relationship Info
                 edges.append((s_id, t_id, rel.type))
                 edge_types_set.add(rel.type)
                 
@@ -98,7 +90,6 @@ def show_graph():
     st.title("📊 Live Graph Visualization")
     st.subheader("Interactive view of your migrated Neo4j Graph with Color Guide")
     
-    # Fetch data from Neo4j
     try:
         nodes, edges, all_labels, all_edge_types = fetch_graph_data()
 
@@ -109,49 +100,38 @@ def show_graph():
         st.error(f"Failed to fetch dataset from Neo4j engine: {e}")
         return
 
-    # Compile interactive visual layout schema structure via PyVis rendering library.
     net = Network(height="650px", width="100%", bgcolor="#ffffff", font_color="#000000", directed=True)
     
-    # Pre-map labels to consistent colors
     label_to_color = {}
     for idx, label in enumerate(all_labels):
         color = NODE_COLOR_PALETTE[idx % len(NODE_COLOR_PALETTE)]
         label_to_color[label] = color
 
-    # Pre-map edge types to consistent colors
     edge_to_color = {}
     for idx, edge_type in enumerate(all_edge_types):
         color = EDGE_COLOR_PALETTE[idx % len(EDGE_COLOR_PALETTE)]
         edge_to_color[edge_type] = color
 
-    # Add Nodes
     for node_id, node_info in nodes.items():
         net.add_node(node_id, label=node_info["label"], color=label_to_color[node_info["group"]], title=node_info["group"])
         
-    # Add Edges
     for source, target, label in edges:
-        # Dynamic color mapping depending on the relationship type
         assigned_edge_color = edge_to_color[label]
         net.add_edge(source, target, label=label, color=assigned_edge_color)
         
-    # Enable smooth physics configuration
     net.toggle_physics(True)
     
-    # Save network as temporary HTML
     path = "temp_graph.html"
     try:
         net.save_graph(path)
         
-        # --- HTML INJECTION: Embed a consistent Color Legend inside the PyVis Canvas context ---
         with open(path, 'r', encoding='utf-8') as f:
             html_content = f.read()
 
-        # Check if external HTML legend template exists
         if os.path.exists("legend_template.html"):
             with open("legend_template.html", "r", encoding="utf-8") as tmpl_f:
                 template = tmpl_f.read()
 
-        # --- BUILD DYNAMIC NODE HTML ELEMENTS ---
             node_entries = ""
             for label in all_labels:
                 color = label_to_color[label]
@@ -162,7 +142,6 @@ def show_graph():
                 </div>
                 """
                 
-            # --- BUILD DYNAMIC EDGE HTML ELEMENTS ---
             edge_entries = ""
             for edge_type in all_edge_types:
                 color = edge_to_color[edge_type]
@@ -173,10 +152,8 @@ def show_graph():
                 </div>
                 """
             
-            # Inject data inside placeholders dynamically
             legend_html = template.replace("{{NODE_ITEMS}}", node_entries).replace("{{EDGE_ITEMS}}", edge_entries)
             
-            # Append inside the PyVis Canvas markup
             html_with_legend = re.sub(r'(</body>)', lambda m: legend_html + m.group(1), html_content)
         else:
             logger.warning("The 'legend_template.html' file was missing from workspace. Rendering graph fallback layout.")
