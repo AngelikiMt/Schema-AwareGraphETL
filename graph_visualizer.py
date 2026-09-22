@@ -1,10 +1,11 @@
 """
+Interactive Graph Visualization Module
 What this file does:
-1. Connects to the migrated Neo4j graph database.
-2. Fetches nodes and relationships using a parameterized Cypher query.
-3. Generates an interactive, physics-based network graph using PyVis.
-4. Renders the interactive graph visualization directly inside the Streamlit UI.
-5. Injects a persistent, clear color guide/legend directly into the PyVis canvas output with multi-colored edges.
+1. Connects to the migrated Neo4j graph database
+2. Fetches nodes and relationships using a parameterized Cypher query
+3. Generates an interactive, physics-based network graph using PyVis
+4. Renders the interactive graph visualization directly inside the Streamlit UI
+5. Injects a clear color guide/legend directly into the PyVis canvas output with multi-colored edges
 """
 
 import streamlit as st
@@ -17,8 +18,6 @@ from loguru import logger
 from dotenv import load_dotenv
 
 load_dotenv()
-
-logger.add("app_pipeline.log", rotation="10 MB", retention="10 days", level="DEBUG")
 
 NEO4J_URI = os.environ.get('NEO4J_URI')
 NEO4J_USER = os.environ.get('NEO4J_USER')
@@ -36,12 +35,17 @@ EDGE_COLOR_PALETTE = [
 ]
 
 def fetch_graph_data():
-    """Queries Neo4j to retrieve nodes and their relationships, collecting all metadata."""
-    logger.info("Initiating data fetch session from Neo4j target instance.")
+    """
+    Queries Neo4j to retrieve nodes and their relationships, collecting all metadata
+    1. runs a graph traversal query:
+        - s --> source node, r --> relationship, t --> target node
+    2. Iterates over records and constructs unique node entries using their internal 'element_id' to prevent duplicate rendering
+    """
+    logger.info("Initiating data fetch session from Neo4j target instance")
     
     try:
         driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-        logger.debug("Neo4j database driver connection established successfully.")
+        logger.success("Neo4j database driver connection established successfully.")
     except Exception as e:
         logger.error(f"Failed to instantiate Neo4j GraphDatabase driver connection: {e}")
         raise e
@@ -52,16 +56,17 @@ def fetch_graph_data():
     edge_types_set = set()
     
     query = "MATCH (s)-[r]->(t) RETURN s, r, t"
-    logger.debug(f"Executing Cypher query topology fetch payload: {query}")
+    logger.info(f"Executing Cypher query topology fetch payload: {query}")
     
     try:
         with driver.session(database=DATABASE_NAME) as session:
             result = session.run(query)
             for record in result:
                 source = record["s"]
-                rel = record["r"]
+                relationship = record["r"]
                 target = record["t"]
-                
+
+                # Unique id for ensuring that each node will be stored only once
                 s_id = source.element_id
                 s_label = list(source.labels)[0]
                 s_name = source.get("name") or source.get("title") or (str(list(source.values())[0]) if source.values() else "Unknown")
@@ -74,8 +79,8 @@ def fetch_graph_data():
                 nodes[t_id] = {"label": f"{t_label}: {t_name}", "group": t_label}
                 node_labels_set.add(t_label)
                 
-                edges.append((s_id, t_id, rel.type))
-                edge_types_set.add(rel.type)
+                edges.append((s_id, t_id, relationship.type))
+                edge_types_set.add(relationship.type)
                 
         logger.success(f"Successfully extracted graph entities. Extracted {len(nodes)} nodes, {len(edges)} edges.")
     except Exception as e:
@@ -87,6 +92,14 @@ def fetch_graph_data():
     return nodes, edges, sorted(list(node_labels_set)), sorted(list(edge_types_set))
 
 def show_graph():
+    """
+    enders an interactive, physics-enabled network graph with an embedded legend in Streamlit
+    1. Fetches graph entities --> fetch_graph_data()
+    2. Initializes a PyVis Network instance with interactive physics
+    3. Dynamically maps color palettes to unique node labels and edge types  
+    4. Populates the Network graph canvas with nodes and edges
+    5. Cleans the disk by deleting the graph file that PyVis creates before using it to avoid leftover error 
+    """
     st.title("📊 Live Graph Visualization")
     st.subheader("Interactive view of your migrated Neo4j Graph with Color Guide")
     

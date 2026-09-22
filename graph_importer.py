@@ -1,12 +1,13 @@
 """
+Core Ingestion and Migration ETL
 What this file does:
-1. Implements scalability via Memory-Efficient Batch Ingestion.
-    - Reads relational data from database in configurable chunks (10,000 rows).
-    - Performs dynamic Data Type Casting (Booleans, Temporal formatted Datetimes).
-    - Handles SQL NULLs via Python None conversion (Null Property Suppression).
-2. Schema enforcement by dynamically creating Uniqueness Constraints in Neo4j.
-3. Automated graph relationship generation based on custom JSON directions.
-4. Performs Post-Migration Validation (Data Integrity Audit) comparing entity row counts.
+1. Implements Memory-Efficient Batch Ingestion.
+    - Reads relational data from database in chunks (10,000 rows).
+    - Converts Data Types (Booleans, Datetimes, Null).
+2. Uniqueness Constraints. Enforces Neo4j constraints using single or composite keys
+3. Graph Construction. Builds nodes and directed edges for 1:N and N:M relationships
+4. Integrity Audit. Compares row counts between MySQL and Neo4j to ensure no data loss
+5. Performance Metrics. Tracks execution time, memory usage and chunks directly in the UI
 """
 
 import json
@@ -15,72 +16,85 @@ import time
 import psutil
 import pandas as pd
 import streamlit as st
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from neo4j import GraphDatabase
 from loguru import logger
 from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_CONNECTION_URI = os.environ.get('DATABASE_CONNECTION_URI', "mysql+pymysql://root:1234@mysql-db:3306/cdbase")
+DATABASE_CONNECTION_URI = os.environ.get('DATABASE_CONNECTION_URI')
 NEO4J_URI = os.environ.get('NEO4J_URI')
 NEO4J_USER = os.environ.get('NEO4J_USER')
 NEO4J_PASSWORD = os.environ.get('NEO4J_PASSWORD')
 DATABASE_NAME = os.environ.get('DATABASE_NAME')
+CHUNKSIZE = int(os.environ.get('CHUNKSIZE'))
 
 try:
     mysql_engine = create_engine(DATABASE_CONNECTION_URI)
     neo4j_driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-    logger.info("Database engines initialized successfully.")
+    logger.success("Database engines initialized successfully.")
 except Exception as e:
-    logger.critical(f"Failed to initialize database connectivity engines: {e}")
+    logger.error(f"Failed to initialize database connectivity engines: {e}")
     raise e
 
 def load_config():
-    """Loads the updated JSON mapping configuration file."""
-    logger.info("Loading JSON mapping configuration matrix from disk.")
+    """Loads the JSON mapping_config file"""
+    logger.info("Loading JSON mapping configuration")
     try:
         with open("mapping_config.json", "r", encoding="utf-8") as f:
-            return json.load(f)
+            loaded_mapping_config_file = json.load(f)
+            logger.info("Successfully loaded mapping_config file")
+            return loaded_mapping_config_file
     except Exception as e:
         logger.error(f"Failed to load 'mapping_config.json': {e}")
         raise e
 
 def create_constraints_and_nodes(config):
-    """Creates schema constraints and ingests relational rows as Graph Nodes."""
-    logger.info("Starting Phase 1: Schema Constraints Creation and Graph Node Ingestion.")
+    """
+    Executes Phase 1 of the ETL ingestion pipeline which is to create all Nodes and their constraints in Neo4j
+    1. Reads node configuration from mapping_config.json
+    2. Enforces uniqueness constraints in Neo4j for both single and composite primary keys
+    3. Streams records from MySQL tables in chunks
+    4. Transforms, normalizes and sanitizes relational data types 
+        - Converting 0 and 1 values to Python False and True
+        - Replacing SQL date or time with datetime in ISO-8601 format
+        - Replacing NaN with NULLs
+    5. Performs MERGE into Neo4j using the UNWIND
+    """
+    logger.info("Starting Phase 1: Schema Constraints Creation and Graph Node Ingestion")
     st.info("Phase 1: Creating constraints and streaming graph nodes...")
     total_chunks = 0
     chunk_idx = 0
     
     with neo4j_driver.session(database=DATABASE_NAME) as session:
         for node in config["nodes"]:
-            pks = node["primary_keys"]
+            primary_keys = node["primary_keys"]
             label = node["target_label"]
+
+            constraint_property = "_composite_id" if len(primary_keys) > 1 else (primary_keys[0] if primary_keys else None)
             
-            constraint_prop = "_composite_id" if len(pks) > 1 else (pks[0] if pks else None)
-            
-            if constraint_prop:
-                constraint_query = f"CREATE CONSTRAINT FOR (n:`{label}`) REQUIRE n.`{constraint_prop}` IS UNIQUE"
+            if constraint_property:
+                constraint_query = f"CREATE CONSTRAINT FOR (n:`{label}`) REQUIRE n.`{constraint_property}` IS UNIQUE"
                 try:
                     session.run(constraint_query)
-                    logger.info(f"Enforced uniqueness constraint on Node Label '{label}' for property '{constraint_prop}'.")
+                    logger.info(f"Enforced uniqueness constraint on Node Label '{label}' for property '{constraint_property}'.")
                 except Exception:
-                    logger.debug(f"Uniqueness constraint for Label '{label}' already exists. Skipping.")
+                    logger.warning(f"Uniqueness constraint for Label '{label}' already exists. Skipping.")
 
         for node in config["nodes"]:
             table = node["table_name"]
             label = node["target_label"]
-            pks = node["primary_keys"]
+            primary_keys = node["primary_keys"]
             
             logger.info(f"Processing RDBMS Table: '{table}' ➔ Mapping to Target Graph Label: '{label}'")
             
             try:
-                for chunk in pd.read_sql_query(f"SELECT * FROM `{table}`", mysql_engine, chunksize=10000):
+                for chunk in pd.read_sql_query(f"SELECT * FROM `{table}`", mysql_engine, chunksize=CHUNKSIZE):
                     chunk_idx += 1
                     total_chunks += 1
                     logger.info(f"Extracting batch chunk #{chunk_idx} from table '{table}' containing {len(chunk)} records.")
-                    
+
                     for col in chunk.columns:
                         if chunk[col].dtype == 'int64' and chunk[col].nunique() <= 2 and set(chunk[col].dropna().unique()).issubset({0, 1}):
                             chunk[col] = chunk[col].astype(bool)
@@ -89,20 +103,21 @@ def create_constraints_and_nodes(config):
                     
                     chunk = chunk.astype(object).where(pd.notnull(chunk), None)
 
-                    if len(pks) > 1:
+                    if len(primary_keys) > 1:
                         if chunk.empty:
                             chunk["_composite_id"] = pd.Series(dtype=str)
                         else:
-                            chunk["_composite_id"] = chunk[pks].astype(str).agg('_'.join, axis=1)
-                        merge_pk = "_composite_id"
+                            chunk["_composite_id"] = chunk[primary_keys].astype(str).agg('_'.join, axis=1)
+                        merge_primaryKey = "_composite_id"
                     else:
-                        merge_pk = pks[0] if pks else "id"
+                        merge_primaryKey = primary_keys[0] if primary_keys else "id"
                     
-                    batch_data = chunk.to_dict(orient="records")                    
-                    
+                    batch_data = chunk.to_dict(orient="records")
+
+                    # Build Nodes
                     cypher_query = f"""
                     UNWIND $batch AS row
-                    MERGE (n:`{label}` {{{merge_pk}: row.{merge_pk}}})
+                    MERGE (n:`{label}` {{{merge_primaryKey}: row.{merge_primaryKey}}})
                     ON CREATE SET n += row
                     ON MATCH SET n += row
                     """
@@ -119,58 +134,66 @@ def create_constraints_and_nodes(config):
     return total_chunks
 
 def create_relationships(config):
-    """Generates graph edges matching the RDBMS foreign keys and custom configurations."""
-    logger.info("Starting Phase 2: Generating Directed Graph Edges.")
+    """
+    Executes Phase 2 of the ETL, generates directed graph edges (relationships) between Neo4j nodes:
+    1. Checks the relationship type
+        - MANY-TO-MANY: Connects source and target nodes through an intermediate junction table
+        - ONE-TO-MANY: Directly links source and target nodes using foreign key (FK) references
+    2. Reads relational data in chuncks of CHUNKSIZE to avoid OOM errors
+    3. Resolves composite primary/foreign keys by concatenating columns into combined ID strings for node lookup (_composite_id)
+    3. Sets the relationship arrow direction (FORWARD or REVERSE) chosen by the user
+    4. Executes batch ingestion into Neo4j via Cypher's UNWIND and MERGE
+    """
+    logger.info("Starting Phase 2: Generating Directed Graph Edges")
     st.info("Phase 2: Building directed graph relationship edges...")
     total_chunks = 0
     chunk_idx = 0
     total_edges_created = 0
     
     with neo4j_driver.session(database=DATABASE_NAME) as session:
-        for rel in config["relationships"]:
-            rel_kind = rel.get("type", "ONE_TO_MANY")
+        for relationship in config["relationships"]:
+            relationship_kind = relationship.get("type", "ONE_TO_MANY")
 
-            if rel_kind == "MANY_TO_MANY":
+            if relationship_kind == "MANY_TO_MANY":
 
-                j_table = rel["junction_table"]
-                src_table = rel["source_table"]
-                tgt_table = rel["target_table"]
-                src_fk = rel["source_fk"][0]
-                src_pk = rel["source_pk"][0]
-                tgt_fk = rel["target_fk"][0]
-                tgt_pk = rel["target_pk"][0]
-                rel_type = rel["relationship_type"]
-                direction = rel["direction"]
+                junction_table = relationship["junction_table"]
+                source_table = relationship["source_table"]
+                target_table = relationship["target_table"]
+                source_fk = relationship["source_fk"][0]
+                source_pk = relationship["source_pk"][0]
+                target_fk = relationship["target_fk"][0]
+                target_pk = relationship["target_pk"][0]
+                relationship_type = relationship["relationship_type"]
+                direction = relationship["direction"]
 
                 arrow = (
-                    f"-[:`{rel_type}`]->"
+                    f"-[:`{relationship_type}`]->"
                     if direction == "FORWARD"
-                    else f"<-[:`{rel_type}`]-"
+                    else f"<-[:`{relationship_type}`]-"
                 )
 
-                query_sql = f"SELECT * FROM `{j_table}`"
-                for chunk in pd.read_sql_query(
-                    query_sql, mysql_engine, chunksize=10000
-                ):
+                query_sql = f"SELECT * FROM `{junction_table}`"
+                for chunk in pd.read_sql_query(query_sql, mysql_engine, chunksize=CHUNKSIZE):
                     batch_data = chunk.astype(object).where(pd.notnull(chunk), None)
                     batch_records = batch_data.to_dict(orient="records")
 
+                    # Builds Edges
                     cypher = f"""
-                                UNWIND $batch AS row
-                                MATCH (source:`{src_table}` {{{src_pk}: row.{src_fk}}})
-                                MATCH (target:`{tgt_table}` {{{tgt_pk}: row.{tgt_fk}}})
-                                MERGE (source){arrow}(target)
-                                """
+                    UNWIND $batch AS row
+                    MATCH (source:`{source_table}` {{{source_pk}: row.{source_fk}}})
+                    MATCH (target:`{target_table}` {{{target_pk}: row.{target_fk}}})
+                    MERGE (source){arrow}(target)
+                    """
                     session.run(cypher, batch=batch_records)
                     total_edges_created += len(batch_records)
 
             else:
-                fk_table = rel["fk_table"]
-                pk_table = rel["pk_table"]
-                fk_cols = rel["fk_columns"]
-                pk_cols = rel["pk_columns"]
-                rel_type = rel["relationship_type"]
-                direction = rel["direction"]
+                fk_table = relationship["fk_table"]
+                pk_table = relationship["pk_table"]
+                fk_columns = relationship["fk_columns"]
+                pk_columns = relationship["pk_columns"]
+                relationship_type = relationship["relationship_type"]
+                direction = relationship["direction"]
             
                 try:
                     source_label = next(n["target_label"] for n in config["nodes"] if n["table_name"] == fk_table)
@@ -181,14 +204,14 @@ def create_relationships(config):
                     logger.error(f"Mapping configuration schema mismatch for labels: {fk_table} or {pk_table}")
                     continue
                     
-                logger.info(f"Mapping Relationship Edge [{rel_type}] ({direction}) between nodes '{source_label}' and '{target_label}'")
+                logger.info(f"Mapping Relationship Edge [{relationship_type}] ({direction}) between nodes '{source_label}' and '{target_label}'")
                 
-                select_cols = list(set(fk_cols + source_pks))
-                cols_str = ", ".join([f"`{c}`" for c in select_cols])
-                query_sql = f"SELECT {cols_str} FROM `{fk_table}`"
+                select_columns = list(set(fk_columns + source_pks))
+                columns_str = ", ".join([f"`{c}`" for c in select_columns])
+                query_sql = f"SELECT {columns_str} FROM `{fk_table}`"
                 
                 try:
-                    for chunk in pd.read_sql_query(query_sql, mysql_engine, chunksize=10000):
+                    for chunk in pd.read_sql_query(query_sql, mysql_engine, chunksize=CHUNKSIZE):
                         chunk_idx += 1
                         total_chunks += 1
                         
@@ -205,18 +228,19 @@ def create_relationships(config):
                             if chunk.empty:
                                 chunk["_target_composite_id"] = pd.Series(dtype=str)
                             else:
-                                chunk["_target_composite_id"] = chunk[fk_cols].astype(str).agg('_'.join, axis=1)
+                                chunk["_target_composite_id"] = chunk[fk_columns].astype(str).agg('_'.join, axis=1)
                             target_match = "target._composite_id = row._target_composite_id"
                         else:
-                            target_match = f"target.{pk_cols[0]} = row.{fk_cols[0]}"
+                            target_match = f"target.{pk_columns[0]} = row.{fk_columns[0]}"
                         
                         if direction == "FORWARD":
-                            cypher_rel = f"MERGE (source)-[:`{rel_type}`]->(target)"
+                            cypher_rel = f"MERGE (source)-[:`{relationship_type}`]->(target)"
                         else:
-                            cypher_rel = f"MERGE (source)<-[:`{rel_type}`]-(target)"
+                            cypher_rel = f"MERGE (source)<-[:`{relationship_type}`]-(target)"
                         
                         batch_data = chunk.to_dict(orient="records")
-                        
+
+                        # Buids Edges
                         cypher_query = f"""
                         UNWIND $batch AS row
                         MATCH (source:`{source_label}`) WHERE {source_match}
@@ -228,10 +252,10 @@ def create_relationships(config):
                         total_edges_created += len(batch_data)
                         logger.info(f"Linked edge relation chunk #{chunk_idx}. Chunk total: {len(batch_data)}")
                         
-                    st.caption(f"Mapped edge constraint candidate: `{fk_table}` ➔ `{pk_table}` [{rel_type}]")
-                    logger.success(f"Successfully generated graph edges for relationship type [{rel_type}].")
+                    st.caption(f"Mapped edge constraint candidate: `{fk_table}` ➔ `{pk_table}` [{relationship_type}]")
+                    logger.success(f"Successfully generated graph edges for relationship type [{relationship_type}].")
                 except Exception as e:
-                    logger.error(f"Edge generation failed for relationship type '{rel_type}': {e}")
+                    logger.error(f"Edge generation failed for relationship type '{relationship_type}': {e}")
                     raise e
                 
     logger.info(f"Final number of total relationship chunks extracted: {total_chunks}.")
@@ -273,7 +297,17 @@ def validate_migration(config):
     return all_passed, audit_results
 
 def run_full_migration():
-    """Wrapper function to orchestrate the entire pipeline with Benchmarking enabled."""
+    """
+    Orchestrate the complete end-to-end migration pipeline with benchmarking
+    1. Starts benchmark tracking, execution timer and starting RAM usage
+    2. Clears the Neo4j database to ensure a clean migration workspace
+    3. Executes the 3 core pipeline phases sequentially:
+        - Creates constraints and nodes --> create_constraints_and_nodes()
+        - Builds directed relationship edges --> create_relationships()
+        - Validates cross-database data integrity --> validate_migration()
+    4. Calculates performance metrics
+    5. Renders a benchmark dashboard and validation table in the Streamlit UI
+    """
     config_data = load_config()
 
     start_time = time.time()

@@ -1,8 +1,10 @@
 """
+The graph Ingestion and Migration UI module
 What this file does:
-1. Provides the UI component for triggering the graph database migration.
-2. Orchestrates execution of the batch processing ETL pipeline via graph_importer.
-3. Implements exception catching and operational status logging.
+1. Provides the UI forinitiate the batch migration process
+2. Batch ETL Orchestrator. Coordinates the execution of data ingestion in chunks
+
+This file calls the graph_importer module
 """
 
 import streamlit as st
@@ -10,11 +12,11 @@ import os
 import graph_importer
 from loguru import logger
 
-def ingest_graph():    
+def ingest_graph():
     st.title("Database Batch Ingestion")
     st.subheader("Execute the Migration Pipeline into Neo4j")
     
-    st.info("Automatic process that reads data from dataset in chunks of 10,000 rows, performs data type casting, and builds nodes/edges in Neo4j.")
+    st.info("Automatic process that reads data from dataset in chunks of 10,000 rows, performs data type casting and builds nodes/edges in Neo4j.")
     logger.info("Automatic End-to-End graph migration sequence.")
     
     if os.path.exists("mapping_config.json"):

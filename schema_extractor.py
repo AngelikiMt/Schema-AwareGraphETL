@@ -1,9 +1,13 @@
 """
+Relational Schema Ectraction and Graph Mapping Pipeline
 What this file does:
-1. Connects Python with multiple databases, such as MySQL, PostgreSQL, SQLite.
-2. Reads the metadata of the tables as well as their Foreign Keys (Schema Extraction).
-3. Establishes the default structural direction for graph relationships.
-4. Generates the mapping_config.json file for storing the graph configuration.
+1. Connects Python with multiple databases, such as MySQL, PostgreSQL, SQLite
+2. Entity Detection. Reads the metadata of the tables as well as their Foreign Keys (Schema Extraction)
+3. Establishes the default structural direction for graph relationships
+4. A junction table has a composite PK, which is consisted of entirely two or more FKs. 
+   It is converted to an edge in the graph
+5. Converts pure and hybrid relational tables to graph nodes. 
+6. Generates the mapping_config.json file for storing the graph configuration
 """
 
 import os
@@ -20,7 +24,7 @@ def extract_schema_to_json(DATABASE_CONNECTION_URI, output_json_path):
     try:
         engine = create_engine(DATABASE_CONNECTION_URI)
         inspector = inspect(engine)
-        logger.debug("SQLAlchemy engine connected successfully to target RDBMS endpoint.")
+        logger.success("SQLAlchemy engine connected successfully to target RDBMS endpoint.")
     except Exception as e:
         logger.error(f"Database connection engine instantiation failed: {e}")
         raise e
@@ -38,7 +42,7 @@ def extract_schema_to_json(DATABASE_CONNECTION_URI, output_json_path):
         raise e
     
     for table in tables:
-        logger.debug(f"Processing structural metadata extraction for table: '{table}'")
+        logger.info(f"Processing structural metadata extraction for table: '{table}'")
         
         try:
             pk_constraint = inspector.get_pk_constraint(table)
@@ -60,7 +64,7 @@ def extract_schema_to_json(DATABASE_CONNECTION_URI, output_json_path):
                 logger.info(f"Table '{table}' detected as PURE JUNCTION TABLE -> Converted to Graph Relationship.")
 
                 fk1, fk2 = fkeys[0], fkeys[1]
-                edge_props = [c for c in columns if c not in pk_columns]
+                edge_properties = [c for c in columns if c not in pk_columns]
 
                 mapping_config["relationships"].append({
                     "type": "MANY_TO_MANY",
@@ -73,20 +77,14 @@ def extract_schema_to_json(DATABASE_CONNECTION_URI, output_json_path):
                     "target_fk": fk2["constrained_columns"],
                     "relationship_type": table.upper(),
                     "direction": "FORWARD",
-                    "properties": edge_props,
+                    "properties": edge_properties,
                 })
                 continue
             
             if len(pk_columns) > 1:
-                logger.info(
-                    f"Table '{table}' detected as HYBRID ENTITY (Composite PK with own"
-                    f" attributes: {pk_columns}) -> Node"
-                )
+                logger.info(f"Table '{table}' detected as ENTITY with a Composite PK with own attributes: {pk_columns} -> Node")
             else:
-                logger.info(
-                    f"Table '{table}' detected as PURE ENTITY -> Node with PK"
-                    f" {pk_columns}"
-                )
+                logger.info(f"Table '{table}' detected as PURE ENTITY with PK {pk_columns} -> Node")
 
             mapping_config["nodes"].append({
                 "table_name": table,
@@ -100,7 +98,7 @@ def extract_schema_to_json(DATABASE_CONNECTION_URI, output_json_path):
         
         try:            
             for fk in fkeys:
-                rel_type = f"{table.upper()}_TO_{fk['referred_table'].upper()}"
+                relationship_type = f"{table.upper()}_TO_{fk['referred_table'].upper()}"
                 
                 mapping_config["relationships"].append({
                     "type": "ONE_TO_MANY",
@@ -108,10 +106,10 @@ def extract_schema_to_json(DATABASE_CONNECTION_URI, output_json_path):
                     "pk_table": fk['referred_table'],
                     "fk_columns": fk['constrained_columns'],
                     "pk_columns": fk['referred_columns'],
-                    "relationship_type": rel_type,
+                    "relationship_type": relationship_type,
                     "direction": "FORWARD"
                 })
-                logger.info(f"Mapped relationship constraint candidate: {table} ➔ {fk['referred_table']} [{rel_type}]")
+                logger.info(f"Mapped relationship constraint: {table} ➔ {fk['referred_table']} [{relationship_type}]")
         except Exception as e:
             logger.error(f"Error mapping relational foreign keys to graph edges for table '{table}': {e}")
             continue

@@ -1,9 +1,14 @@
 """
+The main UI orchestrator of the Relational-to-Graph ETL Pipeline.
 What this file does:
-1. Acts as the central UI of the application.
-2. Integrates the Mapping Configuration Editor (accessible via transition button).
-3. Allows triggering the Graph Ingestion Pipeline directly from the UI.
-4. Embedded the Interactive PyVis Graph Visualizer.
+1. Upload satabase. The user ingests an.sql file
+2. The system auto-extracts schema
+3. Relationship Customization. Enables users configure each relationship label and direction
+4. Graph Ingestiona and Visualization. The system migrates relational data to Neo4j
+5. The system renders an interactive PyVis graph
+6. The user is able to download the final graph topology mapping report in JSON format
+
+This file calls graph_ingestion, graph_visualizer and schema_extractor modules
 """
 
 import os
@@ -20,27 +25,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-logger.remove()
-logger.add(lambda msg: print(msg, end=""), level="INFO")
-logger.add("app_pipeline.log", rotation="10 MB", retention="10 days", level="DEBUG")
-
 DATABASE_DOCKER_CONNECTION = os.environ.get('DATABASE_DOCKER_CONNECTION')
 DATABASE_CONNECTION_URI = os.environ.get('DATABASE_CONNECTION_URI')
 
 st.set_page_config(layout="wide")
-
-# ----------------- Orchestrator - Automation -----------------
-if not os.path.exists("mapping_config.json"):
-    logger.warning("Configuration file 'mapping_config.json' missing. Triggering automated schema extraction.")
-    try:
-        schema_extractor.extract_schema_to_json(DATABASE_DOCKER_CONNECTION, "mapping_config.json")
-        logger.success("Initial schema extracted successfully via native schema_extractor module call.")
-        st.toast("Initial schema extracted successfully!", icon="✅")
-        st.rerun()
-    except Exception as e:
-        logger.error(f"Critical Error: Failed to extract schema natively from the database. Exception: {e}")
-        st.error("Critical Error: Failed to extract schema from the database.")
-        st.stop()
 
 # ----------------- NAVIGATION STATE MANAGEMENT -----------------
 SIDEBAR_PAGES = [
@@ -55,16 +43,17 @@ st.sidebar.title("Page Navigation")
 
 if st.session_state["page_selection"] in SIDEBAR_PAGES:
     current_idx = SIDEBAR_PAGES.index(st.session_state["page_selection"])
-    
+
+    # Creates a radio side bar
     selected_stage = st.sidebar.radio(
-        "Select Operation Stage",
-        SIDEBAR_PAGES,
-        index=current_idx
+        "Select Operation Stage", # Title of the radio buttons
+        SIDEBAR_PAGES, # Pages that includes
+        index=current_idx # Saves the index (0, 1) where the user is currently on
     )
     
     if selected_stage != st.session_state["page_selection"]:
         st.session_state["page_selection"] = selected_stage
-        st.rerun()
+        st.rerun() # Resuns page for loading all page content
 
 else:
     st.sidebar.info("⚙️ Currently editing: Relationship Customization")
@@ -87,9 +76,11 @@ if page == "Upload New Database":
 
     if uploaded_file is not None:
         file_id = uploaded_file.name + "_" + str(uploaded_file.size)
-        
+
+        # Checks if file has already been processed, because streamlit reruns script everytime the user press a button
+        # This way avoids rerunning the Script and deleting/recreating the db after any click.
         if "last_processed_file" not in st.session_state or st.session_state["last_processed_file"] != file_id:
-            sql_script = uploaded_file.read().decode("utf-8", errors="replace")
+            sql_script = uploaded_file.read().decode("utf-8", errors="replace") # errors="replace" replaces any uknown or non valid characters with '?' for the script to not crash
             
             with st.spinner("SQL File detected! Executing script and populating database automatically."):
                 try:
@@ -101,10 +92,12 @@ if page == "Upload New Database":
                     existing_tables = inspector.get_table_names()
                     logger.info(f"Dynamically detected existing tables: {existing_tables}")
 
+                    # Splits the .sql script into smaller queries on ;
                     raw_queries = sqlparse.split(sql_script)
                     clean_queries = []      
 
                     for q in raw_queries:
+                        # Cleans queries by removing spaces, new lines, characters like ';', or comments that starts with '--'. 
                         trimmed = q.strip()
                         
                         if not trimmed or trimmed == ';' or trimmed.startswith('--') or trimmed.upper().startswith('USE '):
@@ -120,12 +113,12 @@ if page == "Upload New Database":
                             continue
                         if trimmed.strip(';') == '':
                             continue
-                            
                         clean_queries.append(trimmed)
                     
                     with local_engine.connect() as connection:
                         with connection.begin():
                             if dialect == 'mysql':
+                                # Db cleaning for removing any previous data to avoid errors: 'Table already exists' and 'Duplicate entry for key PRIMARY'
                                 connection.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
                                 for table_name in existing_tables:
                                     connection.execute(text(f"DROP TABLE IF EXISTS `{table_name}`"))
@@ -146,9 +139,12 @@ if page == "Upload New Database":
                                 try:
                                     connection.execute(text(query))
                                 except Exception as query_err:
-                                    logger.error(f"Failed to execute sub-query: {query[:100]}... Error: {query_err}")
+                                    logger.error(f"Failed to execute sub-query: {query}... Error: {query_err}")
                                     raise query_err                                
-                            
+
+                            # Re-enable foreign key checks for MySQL and SQLite to restore relational integrity.
+                            # PostgreSQL is excluded since 'SET CONSTRAINTS ALL DEFERRED' only applies to the active transaction.
+                            # Postgres automatically re-enforces constraints upon commit when the transaction block closes.
                             if dialect == 'mysql':
                                 connection.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
                             elif dialect == 'sqlite':
@@ -157,12 +153,14 @@ if page == "Upload New Database":
                     logger.success(f"Successfully executed dynamic migration matching engine dialect: '{dialect}'.")
 
                     logger.info("Triggering mandatory post-ingestion schema extraction sweep.")
+                    # Calls schema_extractor module and reads the new, cleaned sql schema.
                     schema_extractor.extract_schema_to_json(DATABASE_CONNECTION_URI, "mapping_config.json")
                     logger.success("mapping_config.json updated automatically with fresh metadata schema structures.")
-                    st.toast("New schema mapping structural properties generated!", icon="✅")
+                    st.toast("✅ New schema mapping structural properties generated!")
 
+                    # Sets this script as a processed file, for not to be running after any click
                     st.session_state["last_processed_file"] = file_id
-                    st.success(f"🎉 SQL File processed automatically! Database wiped and populated successfully matching '{dialect.upper()}' dialect guidelines!")
+                    st.success(f"🎉 SQL File processed automatically! Database wiped and populated successfully!")
                 except Exception as e:
                     logger.error(f"Failed to execute SQL script uploaded by user: {e}")
                     st.error(f"Failed to execute SQL script: {e}")
@@ -179,7 +177,7 @@ if page == "Upload New Database":
                 if st.button("Graph Ingestion ➔", key="goto_ingestion_btn", type="primary", use_container_width=True):
                     navigate_to("Run Graph Ingestion and Visualization")
 
-# ----------------- PAGE 1: CUSTOMIZATION -----------------
+# ----------------- PAGE 1: RELATIONSHIP CUSTOMIZATION -----------------
 elif page == "Relationship Customization":
     st.title("Schema-Aware Graph ETL and Migration Pipeline")
     st.subheader("Relationship Directionality")
@@ -187,9 +185,11 @@ elif page == "Relationship Customization":
     try:
         with open("mapping_config.json", "r", encoding="utf-8") as f:
             config = json.load(f)
-        logger.debug("Successfully loaded 'mapping_config.json' for customization.")
+        logger.info("Successfully loaded 'mapping_config.json' for customization.")
     except FileNotFoundError:
         st.error("The file mapping_config.json was not found. Please upload a database first!")
+        logger.warning(f"The file mapping_config.json was not found.")
+        # Stops script execution to avoid pipeline from crashing
         st.stop()
 
     if not config.get("relationships") or len(config["relationships"]) == 0:
@@ -200,15 +200,15 @@ elif page == "Relationship Customization":
         
         **How to fix this without changing your database:**
         1. Open the generated `mapping_config.json` file in your workspace.
-        2. Manually define your **Logical Relationships** in the `"relationships"` array using this format:
+        2. Manually define the **Relationships** in the `"relationships"` array using this format:
         ```json
         "relationships": [
             {
-                "fk_table": "your_source_table",
-                "pk_table": "your_target_table",
+                "fk_table": "source_table",
+                "pk_table": "target_table",
                 "fk_columns": ["ForeignKeyColumn"],
                 "pk_columns": ["PrimaryKeyColumn"],
-                "relationship_type": "YOUR_RELATIONSHIP_LABEL",
+                "relationship_type": "RELATIONSHIP_LABEL",
                 "direction": "FORWARD"
             }
         ]
@@ -219,6 +219,7 @@ elif page == "Relationship Customization":
     else:
         st.write("#### Detected Relationships (Table with foreign key ➔ Table with Primary Key):")
 
+        # Creates a dynamic Streamlit form which enables users to alter relationships metadata
         with st.form("mapping_form"):
             for idx, rel in enumerate(config["relationships"]):
                 st.markdown(f"**Relationship {idx+1}:** Table `{rel['fk_table']}`(`{', '.join(rel['fk_columns'])}`) ➔ Table `{rel['pk_table']}` (`{', '.join(rel['pk_columns'])}`)")
@@ -245,7 +246,7 @@ elif page == "Relationship Customization":
             except Exception as e:
                 st.error(f"Error saving changes: {e}")
 
-    st.write("---")
+    st.divider()
     
     col_back, col_next = st.columns(2)
     with col_back:
@@ -256,7 +257,7 @@ elif page == "Relationship Customization":
         if st.button("Graph Ingestion ➔", key="custom_goto_ingestion_btn", type="primary", use_container_width=True):
             navigate_to("Run Graph Ingestion and Visualization")
 
-# ----------------- PAGE 2: INGESTION and VISUALIZATION -----------------
+# ----------------- PAGE 2: Graph INGESTION and VISUALIZATION -----------------
 elif page == "Run Graph Ingestion and Visualization":
     st.title("Run Graph Migration Pipeline")
     logger.info("Initiating structural graph ingestion routine via graph_ingestion module.")
@@ -276,11 +277,6 @@ elif page == "Run Graph Ingestion and Visualization":
         if os.path.exists("mapping_config.json"):
             with open("mapping_config.json", "r", encoding="utf-8") as f:
                 raw_data = f.read()
-            st.download_button(
-                label="Download Graph Topology Schema Report (JSON)",
-                data=raw_data,
-                file_name="graph_topology_report.json",
-                mime="application/json"
-            )
+            st.download_button(label="Download Graph Topology Schema Report (JSON)", data=raw_data, file_name="graph_topology_report.json", mime="application/json")
     except Exception as e:
         st.error(f"An error occurred while rendering the visualization: {e}")
