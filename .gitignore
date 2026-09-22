@@ -6,6 +6,8 @@ ENV/
 
 # Secrets
 .env/
+.env
+.env.*
 
 # Python bytecode
 **/__pycache__/
