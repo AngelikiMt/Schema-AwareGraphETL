@@ -86,11 +86,13 @@ def extract_schema_to_json(DATABASE_CONNECTION_URI, output_json_path):
             else:
                 logger.info(f"Table '{table}' detected as PURE ENTITY with PK {pk_columns} -> Node")
 
+            clean_properties = [c for c in columns if c not in fk_column_names or c in pk_columns]
+
             mapping_config["nodes"].append({
                 "table_name": table,
                 "target_label": table,
                 "primary_keys": pk_columns,
-                "properties": columns,
+                "properties": clean_properties,
             })
         except Exception as e:
             logger.error(f"Error extracting columns or primary keys for table '{table}': {e}")

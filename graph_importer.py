@@ -68,6 +68,7 @@ def create_constraints_and_nodes(config):
     chunk_idx = 0
     
     with neo4j_driver.session(database=DATABASE_NAME) as session:
+        # Enforce Uniqueness Constraints
         for node in config["nodes"]:
             primary_keys = node["primary_keys"]
             label = node["target_label"]
@@ -82,11 +83,20 @@ def create_constraints_and_nodes(config):
                 except Exception:
                     logger.warning(f"Uniqueness constraint for Label '{label}' already exists. Skipping.")
 
+        # Ingest Nodes
         for node in config["nodes"]:
             table = node["table_name"]
             label = node["target_label"]
             primary_keys = node["primary_keys"]
             
+            fk_columns_in_table = set()
+            for relationship in config.get("relationships", []):
+                if relationship.get("type") == "ONE_TO_MANY" and relationship.get("fk_table") == table:
+                    fk_columns_in_table.update(relationship.get("fk_colimns", []))
+
+            columns_to_strip = [column for column in fk_columns_in_table if column not in primary_keys]
+            if columns_to_strip:
+                logger.info(f"Excluding Foreign Key attributes from node properties for table '{table}': {columns_to_strip}")
             logger.info(f"Processing RDBMS Table: '{table}' ➔ Mapping to Target Graph Label: '{label}'")
             
             try:
@@ -111,8 +121,9 @@ def create_constraints_and_nodes(config):
                         merge_primaryKey = "_composite_id"
                     else:
                         merge_primaryKey = primary_keys[0] if primary_keys else "id"
-                    
-                    batch_data = chunk.to_dict(orient="records")
+
+                    clean_chunk = chunk.drop(columns=columns_to_strip, errors="ignore")
+                    batch_data = clean_chunk.to_dict(orient="records")
 
                     # Build Nodes
                     cypher_query = f"""
@@ -357,7 +368,7 @@ def run_full_migration():
     c1.metric("⏱️ Execution Time", f"{elapsed_time:.2f} sec")
     c2.metric("💾 RAM Consumed", f"{ram_used:.2f} MB")
     c3.metric("📦 Total Chunks", f"{total_chunks} chunks")
-    c4.metric("🖇️Total Unique Relationships", f"{total_edges} relationships")
+    c4.metric("🖇️Total Edges", f"{total_edges} relationships")
     
     st.write("#### Data Integrity Audit Trail")
     st.table(audit_trail)
