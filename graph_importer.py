@@ -329,7 +329,13 @@ def run_full_migration():
     logger.info("Executing complete flush routine on target Neo4j active workspace graph database instance.")
     try:
         with neo4j_driver.session(database=DATABASE_NAME) as session:
-            session.run("MATCH (n) DETACH DELETE n")
+            session.run("""
+                MATCH (n)
+                CALL {
+                    WITH n
+                    DETACH DELETE n
+                } IN TRANSACTIONS OF 10000 ROWS
+            """)
         logger.success("Target Neo4j graph storage memory space successfully cleared for fresh migration streams.")
     except Exception as e:
         logger.error(f"Database graph truncation flush statement execution crashed: {e}")
