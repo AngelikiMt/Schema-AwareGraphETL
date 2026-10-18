@@ -1,0 +1,135 @@
+{
+    "nodes": [
+        {
+            "table_name": "departments",
+            "target_label": "departments",
+            "primary_keys": [
+                "dept_no"
+            ],
+            "properties": [
+                "dept_no",
+                "dept_name"
+            ]
+        },
+        {
+            "table_name": "employees",
+            "target_label": "employees",
+            "primary_keys": [
+                "emp_no"
+            ],
+            "properties": [
+                "emp_no",
+                "birth_date",
+                "first_name",
+                "last_name",
+                "gender",
+                "hire_date"
+            ]
+        },
+        {
+            "table_name": "salaries",
+            "target_label": "salaries",
+            "primary_keys": [
+                "emp_no",
+                "from_date"
+            ],
+            "properties": [
+                "emp_no",
+                "salary",
+                "from_date",
+                "to_date"
+            ]
+        },
+        {
+            "table_name": "titles",
+            "target_label": "titles",
+            "primary_keys": [
+                "emp_no",
+                "title",
+                "from_date"
+            ],
+            "properties": [
+                "emp_no",
+                "title",
+                "from_date",
+                "to_date"
+            ]
+        }
+    ],
+    "relationships": [
+        {
+            "type": "MANY_TO_MANY",
+            "junction_table": "dept_emp",
+            "source_table": "employees",
+            "source_pk": [
+                "emp_no"
+            ],
+            "source_fk": [
+                "emp_no"
+            ],
+            "target_table": "departments",
+            "target_pk": [
+                "dept_no"
+            ],
+            "target_fk": [
+                "dept_no"
+            ],
+            "relationship_type": "DEPT_EMP",
+            "direction": "FORWARD",
+            "properties": [
+                "from_date",
+                "to_date"
+            ]
+        },
+        {
+            "type": "MANY_TO_MANY",
+            "junction_table": "dept_manager",
+            "source_table": "employees",
+            "source_pk": [
+                "emp_no"
+            ],
+            "source_fk": [
+                "emp_no"
+            ],
+            "target_table": "departments",
+            "target_pk": [
+                "dept_no"
+            ],
+            "target_fk": [
+                "dept_no"
+            ],
+            "relationship_type": "DEPT_MANAGER",
+            "direction": "FORWARD",
+            "properties": [
+                "from_date",
+                "to_date"
+            ]
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "salaries",
+            "pk_table": "employees",
+            "fk_columns": [
+                "emp_no"
+            ],
+            "pk_columns": [
+                "emp_no"
+            ],
+            "relationship_type": "SALARIES_TO_EMPLOYEES",
+            "direction": "FORWARD"
+        },
+        {
+            "type": "ONE_TO_MANY",
+            "fk_table": "titles",
+            "pk_table": "employees",
+            "fk_columns": [
+                "emp_no"
+            ],
+            "pk_columns": [
+                "emp_no"
+            ],
+            "relationship_type": "TITLES_TO_EMPLOYEES",
+            "direction": "FORWARD"
+        }
+    ]
+}

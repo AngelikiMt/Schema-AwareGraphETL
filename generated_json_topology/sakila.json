@@ -24,7 +24,6 @@
                 "address",
                 "address2",
                 "district",
-                "city_id",
                 "postal_code",
                 "phone",
                 "last_update"
@@ -51,7 +50,6 @@
             "properties": [
                 "city_id",
                 "city",
-                "country_id",
                 "last_update"
             ]
         },
@@ -75,11 +73,9 @@
             ],
             "properties": [
                 "customer_id",
-                "store_id",
                 "first_name",
                 "last_name",
                 "email",
-                "address_id",
                 "active",
                 "create_date",
                 "last_update"
@@ -96,8 +92,6 @@
                 "title",
                 "description",
                 "release_year",
-                "language_id",
-                "original_language_id",
                 "rental_duration",
                 "rental_rate",
                 "length",
@@ -127,8 +121,6 @@
             ],
             "properties": [
                 "inventory_id",
-                "film_id",
-                "store_id",
                 "last_update"
             ]
         },
@@ -152,9 +144,6 @@
             ],
             "properties": [
                 "payment_id",
-                "customer_id",
-                "staff_id",
-                "rental_id",
                 "amount",
                 "payment_date",
                 "last_update"
@@ -169,10 +158,7 @@
             "properties": [
                 "rental_id",
                 "rental_date",
-                "inventory_id",
-                "customer_id",
                 "return_date",
-                "staff_id",
                 "last_update"
             ]
         },
@@ -186,10 +172,8 @@
                 "staff_id",
                 "first_name",
                 "last_name",
-                "address_id",
                 "picture",
                 "email",
-                "store_id",
                 "active",
                 "username",
                 "password",
@@ -204,8 +188,6 @@
             ],
             "properties": [
                 "store_id",
-                "manager_staff_id",
-                "address_id",
                 "last_update"
             ]
         }

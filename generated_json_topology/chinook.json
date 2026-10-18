@@ -8,8 +8,7 @@
             ],
             "properties": [
                 "AlbumId",
-                "Title",
-                "ArtistId"
+                "Title"
             ]
         },
         {
@@ -41,8 +40,7 @@
                 "PostalCode",
                 "Phone",
                 "Fax",
-                "Email",
-                "SupportRepId"
+                "Email"
             ]
         },
         {
@@ -56,7 +54,6 @@
                 "LastName",
                 "FirstName",
                 "Title",
-                "ReportsTo",
                 "BirthDate",
                 "HireDate",
                 "Address",
@@ -88,7 +85,6 @@
             ],
             "properties": [
                 "InvoiceId",
-                "CustomerId",
                 "InvoiceDate",
                 "BillingAddress",
                 "BillingCity",
@@ -106,8 +102,6 @@
             ],
             "properties": [
                 "InvoiceLineId",
-                "InvoiceId",
-                "TrackId",
                 "UnitPrice",
                 "Quantity"
             ]
@@ -143,9 +137,6 @@
             "properties": [
                 "TrackId",
                 "Name",
-                "AlbumId",
-                "MediaTypeId",
-                "GenreId",
                 "Composer",
                 "Milliseconds",
                 "Bytes",

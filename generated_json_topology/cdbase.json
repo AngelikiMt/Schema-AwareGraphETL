@@ -9,8 +9,7 @@
             "properties": [
                 "cid",
                 "ctitle",
-                "year",
-                "comid"
+                "year"
             ]
         },
         {
@@ -54,9 +53,7 @@
                 "pos"
             ],
             "properties": [
-                "pid",
                 "cid",
-                "sid",
                 "pos"
             ]
         }

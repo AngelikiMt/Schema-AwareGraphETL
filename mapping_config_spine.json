@@ -1,0 +1,52 @@
+{
+  "nodes": [
+    {
+      "table_name": "string (RDBMS source table)",
+      "target_label": "string (Neo4j node label)",
+      "primary_keys": [
+        "string (PK column name)"
+      ],
+      "properties": [
+        "string (attribute name - excluding FKs)"
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "type": "ONE_TO_MANY",
+      "fk_table": "string (Source table holding the FK)",
+      "pk_table": "string (Target table holding the referenced PK)",
+      "fk_columns": [
+        "string (Foreign key column)"
+      ],
+      "pk_columns": [
+        "string (Primary key column)"
+      ],
+      "relationship_type": "string (Cypher relationship type label)",
+      "direction": "FORWARD | REVERSE"
+    },
+    {
+      "type": "MANY_TO_MANY",
+      "junction_table": "string (Intermediate table in RDBMS)",
+      "source_table": "string (Source table entity)",
+      "source_pk": [
+        "string (PK of source table entity)"
+      ],
+      "source_fk": [
+        "string (FK in junction table pointing to source table)"
+      ],
+      "target_table": "string (Destination node table)",
+      "target_pk": [
+        "string (PK of destination table)"
+      ],
+      "target_fk": [
+        "string (FK in junction table pointing to destination table)"
+      ],
+      "relationship_type": "string (Cypher relationship type label)",
+      "direction": "FORWARD | REVERSE",
+      "properties": [
+        "string (relationship metadata attributes, if any)"
+      ]
+    }
+  ]
+}
